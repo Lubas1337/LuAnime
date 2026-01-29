@@ -68,6 +68,19 @@ function parseKodikUrl(url: string): KodikParsed | null {
   return null;
 }
 
+// Extract Set-Cookie headers into a cookie string for forwarding
+function extractCookies(response: Response): string {
+  const cookies: string[] = [];
+  response.headers.forEach((value, key) => {
+    if (key.toLowerCase() === 'set-cookie') {
+      // Extract just the cookie name=value part (before ;)
+      const cookiePart = value.split(';')[0];
+      if (cookiePart) cookies.push(cookiePart);
+    }
+  });
+  return cookies.join('; ');
+}
+
 // Decrypt a single source string using Caesar cipher + Base64
 // Tries the known rotation (18) first, then brute-forces all 26 if needed
 function decryptSource(encrypted: string): string | null {
@@ -100,16 +113,16 @@ function decryptSource(encrypted: string): string | null {
   return null;
 }
 
-// Fetch the player page and extract urlParams + player script URL
-async function fetchPlayerPage(parsed: KodikParsed): Promise<{
+// Fetch the player page and extract urlParams + player script URL + cookies
+async function fetchPlayerPage(parsed: KodikParsed, ua: string): Promise<{
   urlParams: Record<string, string>;
   playerScriptUrl: string | null;
   videoType: string;
   videoId: string;
   videoHash: string;
+  cookies: string;
+  workingDomain: string;
 }> {
-  const ua = randomUA();
-
   // Try multiple domains if the original fails
   const domains = [parsed.host, ...KODIK_DOMAINS.filter(d => d !== parsed.host)];
 
@@ -118,11 +131,13 @@ async function fetchPlayerPage(parsed: KodikParsed): Promise<{
       const url = `https://${domain}/${parsed.type}/${parsed.id}/${parsed.hash}/${parsed.quality}`;
       const response = await fetch(url, {
         headers: { 'User-Agent': ua },
+        redirect: 'follow',
         signal: AbortSignal.timeout(10000),
       });
 
       if (!response.ok) continue;
 
+      const cookies = extractCookies(response);
       const html = await response.text();
 
       // Extract urlParams
@@ -146,6 +161,8 @@ async function fetchPlayerPage(parsed: KodikParsed): Promise<{
         videoType: typeMatch?.[1] || parsed.type,
         videoId: idMatch?.[1] || parsed.id,
         videoHash: hashMatch?.[1] || parsed.hash,
+        cookies,
+        workingDomain: domain,
       };
     } catch {
       continue;
@@ -159,20 +176,30 @@ async function fetchPlayerPage(parsed: KodikParsed): Promise<{
     videoType: parsed.type,
     videoId: parsed.id,
     videoHash: parsed.hash,
+    cookies: '',
+    workingDomain: parsed.host,
   };
 }
 
 // Discover the actual POST endpoint from the player JS bundle
 async function discoverEndpoint(
   host: string,
-  playerScriptUrl: string | null
+  playerScriptUrl: string | null,
+  ua: string,
+  cookies: string
 ): Promise<string> {
   if (!playerScriptUrl) return '/ftor';
 
   try {
     const url = `https://${host}${playerScriptUrl}`;
+    const headers: Record<string, string> = {
+      'User-Agent': ua,
+      Referer: `https://${host}/`,
+    };
+    if (cookies) headers['Cookie'] = cookies;
+
     const response = await fetch(url, {
-      headers: { 'User-Agent': randomUA() },
+      headers,
       signal: AbortSignal.timeout(10000),
     });
 
@@ -198,7 +225,9 @@ async function fetchVideoLinks(
   urlParams: Record<string, string>,
   videoType: string,
   videoId: string,
-  videoHash: string
+  videoHash: string,
+  ua: string,
+  cookies: string
 ): Promise<Record<string, Array<{ src: string; type: string }>>> {
   const params: Record<string, string> = {
     ...urlParams,
@@ -214,35 +243,53 @@ async function fetchVideoLinks(
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&');
 
-  // Try multiple domains
+  // Try the working domain first, then fallbacks
   const domains = [host, ...KODIK_DOMAINS.filter(d => d !== host)];
 
   for (const domain of domains) {
-    try {
-      const url = `https://${domain}${endpoint}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'User-Agent': randomUA(),
+    // Retry each domain up to 2 times
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const url = `https://${domain}${endpoint}`;
+        const headers: Record<string, string> = {
+          'User-Agent': ua,
           'Content-Type': 'application/x-www-form-urlencoded',
           Referer: `https://${domain}/`,
           Origin: `https://${domain}`,
-        },
-        body,
-        signal: AbortSignal.timeout(10000),
-      });
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'X-Requested-With': 'XMLHttpRequest',
+        };
+        if (cookies) headers['Cookie'] = cookies;
 
-      if (!response.ok) continue;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body,
+          signal: AbortSignal.timeout(10000),
+        });
 
-      const data = (await response.json()) as {
-        links?: Record<string, Array<{ src: string; type: string }>>;
-      };
+        if (!response.ok) {
+          if (attempt === 0) {
+            await new Promise(r => setTimeout(r, 500));
+            continue;
+          }
+          break;
+        }
 
-      if (data.links && Object.keys(data.links).length > 0) {
-        return data.links;
+        const data = (await response.json()) as {
+          links?: Record<string, Array<{ src: string; type: string }>>;
+        };
+
+        if (data.links && Object.keys(data.links).length > 0) {
+          return data.links;
+        }
+      } catch {
+        if (attempt === 0) {
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+        break;
       }
-    } catch {
-      continue;
     }
   }
 
@@ -269,21 +316,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Fetch player page to get urlParams, script URL, and video info
-    const { urlParams, playerScriptUrl, videoType, videoId, videoHash } =
-      await fetchPlayerPage(parsed);
+    // Use one consistent UA for the entire request chain
+    const ua = randomUA();
+
+    // 2. Fetch player page to get urlParams, script URL, video info, and cookies
+    const { urlParams, playerScriptUrl, videoType, videoId, videoHash, cookies, workingDomain } =
+      await fetchPlayerPage(parsed, ua);
 
     // 3. Discover the actual POST endpoint from player JS
-    const endpoint = await discoverEndpoint(parsed.host, playerScriptUrl);
+    const endpoint = await discoverEndpoint(workingDomain, playerScriptUrl, ua, cookies);
 
-    // 4. Fetch encrypted video links
+    // 4. Fetch encrypted video links (use the domain that worked for the page)
     const encryptedLinks = await fetchVideoLinks(
-      parsed.host,
+      workingDomain,
       endpoint,
       urlParams,
       videoType,
       videoId,
-      videoHash
+      videoHash,
+      ua,
+      cookies
     );
 
     // 5. Decrypt links
