@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
@@ -83,7 +86,7 @@ function decryptSource(encrypted: string): string | null {
       const pad = (4 - (b64.length % 4)) % 4;
       b64 += '='.repeat(pad);
 
-      const decoded = Buffer.from(b64, 'base64').toString('utf-8');
+      const decoded = atob(b64);
 
       // Verify it looks like a URL
       if (decoded.includes('mp4') || decoded.includes('hls') || decoded.includes('manifest') || decoded.includes('.m3u8')) {
@@ -178,7 +181,7 @@ async function discoverEndpoint(
     // Look for: type:"POST",url:atob("base64string")
     const match = js.match(/type:\s*"POST"\s*,\s*url:\s*atob\("([^"]+)"\)/i);
     if (match) {
-      const decoded = Buffer.from(match[1], 'base64').toString('utf-8');
+      const decoded = atob(match[1]);
       if (decoded.startsWith('/')) return decoded;
     }
   } catch {
@@ -324,9 +327,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ links: results });
   } catch (error) {
-    console.error('Kodik parse error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Kodik parse error:', message, error);
     return NextResponse.json(
-      { error: 'Failed to parse Kodik URL' },
+      { error: 'Failed to parse Kodik URL', detail: message },
       { status: 500 }
     );
   }

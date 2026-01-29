@@ -282,7 +282,10 @@ export function VideoPlayer({
       embedUrl.includes('aniqit.') ||
       embedUrl.includes('kodik.info');
 
-    if (!isKodik) return;
+    if (!isKodik) {
+      setKodikFailed(true);
+      return;
+    }
 
     let cancelled = false;
 
@@ -313,8 +316,8 @@ export function VideoPlayer({
     };
   }, [embedUrl, kodikSources.length, kodikFailed]);
 
-  // If embed URL is provided and kodik parsing is in progress, show loading
-  if (embedUrl && kodikParsing) {
+  // If embed URL is provided and kodik parsing hasn't completed yet, show loading
+  if (embedUrl && kodikSources.length === 0 && !kodikFailed) {
     return (
       <div
         ref={containerRef}
@@ -325,8 +328,8 @@ export function VideoPlayer({
     );
   }
 
-  // If embed URL is provided and kodik failed (or not a kodik URL), show iframe player
-  if (embedUrl && kodikSources.length === 0) {
+  // If embed URL is provided and kodik parsing explicitly failed, show iframe player
+  if (embedUrl && kodikSources.length === 0 && kodikFailed) {
     return (
       <div
         ref={containerRef}
