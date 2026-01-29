@@ -13,7 +13,6 @@ enum APIError: Error, LocalizedError {
     case networkError(Error)
     case decodingError(Error)
     case serverError(Int, String?)
-    case unauthorized
     case notFound
 
     var errorDescription: String? {
@@ -28,8 +27,6 @@ enum APIError: Error, LocalizedError {
             return "Data error: \(error.localizedDescription)"
         case .serverError(let code, let message):
             return message ?? "Server error: \(code)"
-        case .unauthorized:
-            return "Unauthorized. Please login again."
         case .notFound:
             return "Resource not found"
         }
@@ -56,8 +53,7 @@ actor APIService {
     private func request<T: Decodable>(
         path: String,
         method: String = "GET",
-        body: [String: Any]? = nil,
-        token: String? = nil
+        body: [String: Any]? = nil
     ) async throws -> T {
         guard let url = URL(string: baseURL + path) else {
             throw APIError.invalidURL
@@ -67,10 +63,6 @@ actor APIService {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         if let body = body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -92,8 +84,6 @@ actor APIService {
                     print("Response: \(String(data: data, encoding: .utf8) ?? "nil")")
                     throw APIError.decodingError(error)
                 }
-            case 401:
-                throw APIError.unauthorized
             case 404:
                 throw APIError.notFound
             default:
@@ -170,75 +160,6 @@ actor APIService {
         return response.episodes ?? []
     }
 
-    // MARK: - Favorites
-
-    func getFavorites(token: String, page: Int = 0) async throws -> [Anime] {
-        let response: FavoritesResponse = try await request(path: "/favorite/\(page)", token: token)
-        return response.content ?? []
-    }
-
-    func addFavorite(animeId: Int, token: String) async throws -> Bool {
-        let _: GenericResponse = try await request(path: "/favorite/add/\(animeId)", token: token)
-        return true
-    }
-
-    func removeFavorite(animeId: Int, token: String) async throws -> Bool {
-        let _: GenericResponse = try await request(path: "/favorite/delete/\(animeId)", token: token)
-        return true
-    }
-
-    // MARK: - Auth (Demo mode — matches web app behavior)
-
-    func login(login: String, password: String) async throws -> AuthResponse {
-        // Demo auth: accept password "demo" or password == login (same as web app)
-        guard password == "demo" || password == login else {
-            throw APIError.serverError(401, "Неверный логин или пароль")
-        }
-
-        let token = "mock_token_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(8))"
-        let userId = abs(login.hashValue % 100000)
-        let user = User(
-            id: userId,
-            login: login,
-            email: "\(login)@example.com",
-            avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=\(login)",
-            status: nil,
-            isPremium: false,
-            createdAt: nil,
-            lastOnline: nil
-        )
-
-        return AuthResponse(profileToken: token, profile: user, code: 0, error: nil)
-    }
-
-    func register(login: String, email: String, password: String) async throws -> AuthResponse {
-        guard !login.isEmpty, !email.isEmpty, password.count >= 6 else {
-            throw APIError.serverError(400, "Все поля обязательны, пароль минимум 6 символов")
-        }
-
-        let token = "mock_token_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(8))"
-        let userId = abs(login.hashValue % 100000)
-        let user = User(
-            id: userId,
-            login: login,
-            email: email,
-            avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=\(login)",
-            status: nil,
-            isPremium: false,
-            createdAt: nil,
-            lastOnline: nil
-        )
-
-        return AuthResponse(profileToken: token, profile: user, code: 0, error: nil)
-    }
-
-    func getProfile(userId: Int, token: String? = nil) async throws -> User {
-        let response: ProfileResponse = try await request(path: "/profile/\(userId)", token: token)
-        guard let profile = response.profile else {
-            throw APIError.notFound
-        }
-        return profile
-    }
 }
 
 // MARK: - API Response Models
@@ -310,17 +231,3 @@ struct EpisodesResponse: Codable {
     let episodes: [Episode]?
 }
 
-struct FavoritesResponse: Codable {
-    let code: Int?
-    let content: [Anime]?
-}
-
-struct GenericResponse: Codable {
-    let code: Int?
-    let error: String?
-}
-
-struct ProfileResponse: Codable {
-    let code: Int?
-    let profile: User?
-}

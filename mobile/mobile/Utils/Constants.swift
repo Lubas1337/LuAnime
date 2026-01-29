@@ -17,8 +17,6 @@ enum AppConstants {
     }
 
     enum Storage {
-        static let authTokenKey = "auth_token"
-        static let userKey = "current_user"
         static let favoritesKey = "local_favorites"
         static let historyKey = "watch_history"
         static let mangaFavoritesKey = "manga_favorites"

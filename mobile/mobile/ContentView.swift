@@ -9,7 +9,6 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedTab: TabItem = .home
-    @State private var authStore = AuthStore.shared
     @State private var favoritesStore = FavoritesStore.shared
     @State private var modeStore = AppModeStore.shared
 

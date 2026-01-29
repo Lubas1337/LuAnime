@@ -58,15 +58,11 @@ final class FavoritesStore {
         let item = FavoriteItem(animeId: anime.id, addedAt: Date(), anime: anime)
         favorites.insert(item, at: 0)
         saveToStorage()
-
-        syncWithServer(anime: anime, add: true)
     }
 
     func removeFavorite(animeId: Int) {
         favorites.removeAll { $0.animeId == animeId }
         saveToStorage()
-
-        syncWithServer(animeId: animeId, add: false)
     }
 
     func toggleFavorite(anime: Anime) {
@@ -74,56 +70,6 @@ final class FavoritesStore {
             removeFavorite(animeId: anime.id)
         } else {
             addFavorite(anime: anime)
-        }
-    }
-
-    private func syncWithServer(anime: Anime? = nil, animeId: Int? = nil, add: Bool) {
-        guard let token = AuthStore.shared.token else { return }
-
-        Task {
-            do {
-                if add, let anime = anime {
-                    _ = try await APIService.shared.addFavorite(animeId: anime.id, token: token)
-                } else if let animeId = animeId {
-                    _ = try await APIService.shared.removeFavorite(animeId: animeId, token: token)
-                }
-            } catch {
-                print("Failed to sync favorite with server: \(error)")
-            }
-        }
-    }
-
-    // MARK: - Server Sync
-
-    func fetchFromServer() async {
-        guard let token = AuthStore.shared.token else { return }
-
-        await MainActor.run {
-            isLoading = true
-        }
-
-        do {
-            let serverFavorites = try await APIService.shared.getFavorites(token: token)
-
-            await MainActor.run {
-                for anime in serverFavorites {
-                    if !isFavorite(anime.id) {
-                        let item = FavoriteItem(animeId: anime.id, addedAt: Date(), anime: anime)
-                        favorites.append(item)
-                    } else {
-                        if let index = favorites.firstIndex(where: { $0.animeId == anime.id }) {
-                            favorites[index].anime = anime
-                        }
-                    }
-                }
-                saveToStorage()
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                self.error = error.localizedDescription
-                isLoading = false
-            }
         }
     }
 
