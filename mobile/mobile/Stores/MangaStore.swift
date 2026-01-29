@@ -83,6 +83,16 @@ final class MangaStore {
         )
     }
 
+    func clearHistory() {
+        readingHistory.removeAll()
+        saveHistory()
+    }
+
+    func removeFromHistory(mangaId: String, chapterId: String) {
+        readingHistory.removeAll { $0.mangaId == mangaId && $0.chapterId == chapterId }
+        saveHistory()
+    }
+
     var chaptersRead: Int {
         readingHistory.filter(\.isCompleted).count
     }

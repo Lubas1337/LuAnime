@@ -9,7 +9,7 @@ import SwiftUI
 
 struct HistoryTab: View {
     @State private var playerStore = PlayerStore.shared
-    @State private var selectedAnime: Anime?
+    @Binding var selectedAnime: Anime?
 
     var body: some View {
         Group {
@@ -18,9 +18,6 @@ struct HistoryTab: View {
             } else {
                 historyList
             }
-        }
-        .navigationDestination(item: $selectedAnime) { anime in
-            AnimeDetailView(anime: anime)
         }
     }
 
@@ -151,7 +148,7 @@ struct HistoryRow: View {
         AppGradients.background
             .ignoresSafeArea()
 
-        HistoryTab()
+        HistoryTab(selectedAnime: .constant(nil))
             .padding()
     }
 }
