@@ -34,7 +34,6 @@ function parseKodikUrl(url: string): KodikParsed | null {
     };
   }
 
-  // Alternative format
   try {
     const fullUrl = url.startsWith('//') ? `https:${url}` : url;
     const parsed = new URL(fullUrl);
@@ -56,14 +55,14 @@ function parseKodikUrl(url: string): KodikParsed | null {
   return null;
 }
 
-// Try to discover the actual video info endpoint from the player JS bundle
-async function discoverEndpoint(host: string): Promise<string | null> {
-  const domains = [host, ...KODIK_DOMAINS.filter(d => d !== host)];
+// Discover the actual video info endpoint from the player page JS bundle
+async function discoverEndpoint(parsed: KodikParsed): Promise<string | null> {
+  const domains = [parsed.host, ...KODIK_DOMAINS.filter(d => d !== parsed.host)];
 
   for (const domain of domains) {
     try {
-      // Fetch the player page to find the JS bundle URL
-      const pageUrl = `https://${domain}/`;
+      // Fetch the actual player page (not root) to find the JS bundle
+      const pageUrl = `https://${domain}/${parsed.type}/${parsed.id}/${parsed.hash}/${parsed.quality}`;
       const pageRes = await fetch(pageUrl, { signal: AbortSignal.timeout(5000) });
       if (!pageRes.ok) continue;
 
@@ -71,9 +70,9 @@ async function discoverEndpoint(host: string): Promise<string | null> {
       const scriptMatch = html.match(/src="(\/assets\/js\/app\.player_single\.[a-z0-9]+\.js)"/);
       if (!scriptMatch) continue;
 
-      // Fetch the JS bundle
-      const jsUrl = `https://${domain}${scriptMatch[1]}`;
-      const jsRes = await fetch(jsUrl, { signal: AbortSignal.timeout(5000) });
+      const jsRes = await fetch(`https://${domain}${scriptMatch[1]}`, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (!jsRes.ok) continue;
 
       const js = await jsRes.text();
@@ -90,7 +89,7 @@ async function discoverEndpoint(host: string): Promise<string | null> {
   return null;
 }
 
-// Fetch video links using simple GET (like kodikwrapper does)
+// Fetch video links — try both GET and POST
 async function fetchVideoLinks(
   parsed: KodikParsed,
   endpoint: string
@@ -104,30 +103,44 @@ async function fetchVideoLinks(
   const domains = [parsed.host, ...KODIK_DOMAINS.filter(d => d !== parsed.host)];
 
   for (const domain of domains) {
-    try {
-      const url = `https://${domain}${endpoint}?${params.toString()}`;
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(10000),
-      });
+    // Try GET first, then POST
+    for (const method of ['GET', 'POST'] as const) {
+      try {
+        const url = method === 'GET'
+          ? `https://${domain}${endpoint}?${params.toString()}`
+          : `https://${domain}${endpoint}`;
 
-      if (!response.ok) continue;
+        const response = await fetch(url, {
+          method,
+          ...(method === 'POST' ? {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          } : {}),
+          signal: AbortSignal.timeout(10000),
+        });
 
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('json')) continue;
+        if (!response.ok) continue;
 
-      const data = (await response.json()) as {
-        links?: Record<string, Array<{ src: string; type: string }>>;
-      };
+        const text = await response.text();
+        if (!text.trim()) continue;
 
-      if (data.links && Object.keys(data.links).length > 0) {
-        return data.links;
+        let data: { links?: Record<string, Array<{ src: string; type: string }>> };
+        try {
+          data = JSON.parse(text);
+        } catch {
+          continue;
+        }
+
+        if (data.links && Object.keys(data.links).length > 0) {
+          return data.links;
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
     }
   }
 
-  throw new Error(`No links from any domain with endpoint ${endpoint}`);
+  throw new Error('Failed to fetch video links from all domains');
 }
 
 // Decrypt video source URL: ROT18 + Base64
@@ -159,7 +172,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Parse the Kodik URL
     const parsed = parseKodikUrl(kodikUrl);
     if (!parsed) {
       return NextResponse.json(
@@ -168,13 +180,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Try to discover the actual endpoint, then try fallbacks
-    const discoveredEndpoint = await discoverEndpoint(parsed.host);
+    // Discover actual endpoint, fall back to known ones
+    const discoveredEndpoint = await discoverEndpoint(parsed);
     const endpoints = discoveredEndpoint
       ? [discoveredEndpoint, ...FALLBACK_ENDPOINTS.filter(e => e !== discoveredEndpoint)]
       : FALLBACK_ENDPOINTS;
 
-    // 3. Try each endpoint until one works
+    // Try each endpoint
     let encryptedLinks: Record<string, Array<{ src: string; type: string }>> | null = null;
 
     for (const endpoint of endpoints) {
@@ -193,7 +205,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Decrypt links
+    // Decrypt links
     const results: KodikVideoResult[] = [];
 
     for (const [quality, sources] of Object.entries(encryptedLinks)) {
@@ -225,7 +237,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sort by quality (highest first)
     results.sort((a, b) => {
       const aVal = parseInt(a.quality) || 0;
       const bVal = parseInt(b.quality) || 0;
