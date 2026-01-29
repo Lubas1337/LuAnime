@@ -21,6 +21,14 @@ enum AppConstants {
         static let userKey = "current_user"
         static let favoritesKey = "local_favorites"
         static let historyKey = "watch_history"
+        static let mangaFavoritesKey = "manga_favorites"
+        static let mangaHistoryKey = "manga_reading_history"
+        static let appModeKey = "app_mode"
+    }
+
+    enum ReManga {
+        static let baseURL = "https://api.remanga.org/api/v2"
+        static let mediaBaseURL = "https://api.remanga.org"
     }
 
     enum Animation {
@@ -39,6 +47,7 @@ enum AppConstants {
         static let cardWidth: CGFloat = 150
         static let cardHeight: CGFloat = 220
         static let bannerHeight: CGFloat = 400
+        static let readerPageSpacing: CGFloat = 2
     }
 }
 

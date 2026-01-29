@@ -94,6 +94,17 @@ struct GlassTabBar: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .if(tab == .home) { view in
+            view.contextMenu {
+                ForEach(AppModeStore.AppMode.allCases) { mode in
+                    Button {
+                        AppModeStore.shared.switchMode(mode)
+                    } label: {
+                        Label(mode.displayName, systemImage: mode.icon)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Legacy Tab Bar (iOS 17/18)
@@ -141,6 +152,17 @@ struct GlassTabBar: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .if(tab == .home) { view in
+            view.contextMenu {
+                ForEach(AppModeStore.AppMode.allCases) { mode in
+                    Button {
+                        AppModeStore.shared.switchMode(mode)
+                    } label: {
+                        Label(mode.displayName, systemImage: mode.icon)
+                    }
+                }
+            }
+        }
     }
 }
 

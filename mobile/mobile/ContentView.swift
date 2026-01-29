@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var selectedTab: TabItem = .home
     @State private var authStore = AuthStore.shared
     @State private var favoritesStore = FavoritesStore.shared
+    @State private var modeStore = AppModeStore.shared
 
     var body: some View {
         ZStack {
@@ -28,11 +29,11 @@ struct ContentView: View {
             // iOS 26 with Liquid Glass tab bar
             TabView(selection: $selectedTab) {
                 Tab(TabItem.home.title, systemImage: selectedTab == .home ? TabItem.home.selectedIcon : TabItem.home.icon, value: .home) {
-                    HomeView()
+                    homeContent
                 }
 
                 Tab(TabItem.search.title, systemImage: selectedTab == .search ? TabItem.search.selectedIcon : TabItem.search.icon, value: .search) {
-                    SearchView()
+                    searchContent
                 }
 
                 Tab(TabItem.favorites.title, systemImage: selectedTab == .favorites ? TabItem.favorites.selectedIcon : TabItem.favorites.icon, value: .favorites) {
@@ -48,13 +49,13 @@ struct ContentView: View {
         } else {
             // Fallback for older iOS versions
             TabView(selection: $selectedTab) {
-                HomeView()
+                homeContent
                     .tag(TabItem.home)
                     .tabItem {
                         Label(TabItem.home.title, systemImage: selectedTab == .home ? TabItem.home.selectedIcon : TabItem.home.icon)
                     }
 
-                SearchView()
+                searchContent
                     .tag(TabItem.search)
                     .tabItem {
                         Label(TabItem.search.title, systemImage: selectedTab == .search ? TabItem.search.selectedIcon : TabItem.search.icon)
@@ -75,11 +76,33 @@ struct ContentView: View {
             .tint(AppColors.primary)
         }
     }
+
+    @ViewBuilder
+    private var homeContent: some View {
+        if modeStore.currentMode == .anime {
+            HomeView()
+        } else {
+            MangaHomeView()
+        }
+    }
+
+    @ViewBuilder
+    private var searchContent: some View {
+        if modeStore.currentMode == .anime {
+            SearchView()
+        } else {
+            MangaSearchView()
+        }
+    }
 }
 
 struct FavoritesView: View {
     @State private var favoritesStore = FavoritesStore.shared
+    @State private var mangaStore = MangaStore.shared
+    @State private var modeStore = AppModeStore.shared
     @State private var selectedAnime: Anime?
+    @State private var selectedManga: Manga?
+    @State private var selectedSection: AppModeStore.AppMode = .anime
 
     var body: some View {
         NavigationStack {
@@ -87,46 +110,86 @@ struct FavoritesView: View {
                 AppGradients.background
                     .ignoresSafeArea()
 
-                if favoritesStore.favorites.isEmpty {
-                    emptyState
-                } else {
-                    favoritesList
+                VStack(spacing: 0) {
+                    // Anime/Manga picker
+                    Picker("Section", selection: $selectedSection) {
+                        Text("Anime").tag(AppModeStore.AppMode.anime)
+                        Text("Manga").tag(AppModeStore.AppMode.manga)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding()
+
+                    if selectedSection == .anime {
+                        animeFavorites
+                    } else {
+                        mangaFavorites
+                    }
                 }
             }
             .navigationTitle("Favorites")
             .navigationDestination(item: $selectedAnime) { anime in
                 AnimeDetailView(anime: anime)
             }
+            .navigationDestination(item: $selectedManga) { manga in
+                MangaDetailView(manga: manga)
+            }
         }
     }
 
-    private var emptyState: some View {
-        EmptyStateView(
-            icon: "heart.slash",
-            title: "No Favorites",
-            message: "Add anime to your favorites to see them here",
-            actionTitle: "Browse Anime"
-        ) {
-            // Navigate to search or home
-        }
-    }
-
-    private var favoritesList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(favoritesStore.favorites) { item in
-                    if let anime = item.anime {
-                        FavoriteRow(anime: anime) {
-                            selectedAnime = anime
-                        } onRemove: {
-                            withAnimation {
-                                favoritesStore.removeFavorite(animeId: item.animeId)
+    @ViewBuilder
+    private var animeFavorites: some View {
+        if favoritesStore.favorites.isEmpty {
+            EmptyStateView(
+                icon: "heart.slash",
+                title: "No Anime Favorites",
+                message: "Add anime to your favorites to see them here",
+                actionTitle: "Browse Anime"
+            ) {}
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(favoritesStore.favorites) { item in
+                        if let anime = item.anime {
+                            FavoriteRow(anime: anime) {
+                                selectedAnime = anime
+                            } onRemove: {
+                                withAnimation {
+                                    favoritesStore.removeFavorite(animeId: item.animeId)
+                                }
                             }
                         }
                     }
                 }
+                .padding()
             }
-            .padding()
+        }
+    }
+
+    @ViewBuilder
+    private var mangaFavorites: some View {
+        if mangaStore.favorites.isEmpty {
+            EmptyStateView(
+                icon: "heart.slash",
+                title: "No Manga Favorites",
+                message: "Add manga to your favorites to see them here",
+                actionTitle: "Browse Manga"
+            ) {}
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(mangaStore.favorites) { item in
+                        if let manga = item.manga {
+                            Button {
+                                selectedManga = manga
+                            } label: {
+                                MangaCardCompact(manga: manga)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding()
+            }
         }
     }
 }

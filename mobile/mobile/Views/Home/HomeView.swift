@@ -34,6 +34,11 @@ struct HomeView: View {
             .navigationDestination(item: $selectedAnime) { anime in
                 AnimeDetailView(anime: anime)
             }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    ModeSelector(modeStore: AppModeStore.shared)
+                }
+            }
         }
         .task {
             await loadData()

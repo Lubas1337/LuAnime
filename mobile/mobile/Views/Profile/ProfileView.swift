@@ -125,6 +125,13 @@ struct ProfileView: View {
                 label: "Watched",
                 color: AppColors.primary
             )
+
+            StatCard(
+                icon: "book.fill",
+                value: "\(MangaStore.shared.chaptersRead)",
+                label: "Chapters",
+                color: AppColors.success
+            )
         }
     }
 
