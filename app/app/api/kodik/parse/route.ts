@@ -20,17 +20,17 @@ interface KodikVideoResult {
 const KODIK_DOMAINS = ['kodik.info', 'aniqit.com', 'kodik.cc', 'kodik.biz'];
 const FALLBACK_ENDPOINTS = ['/ftor', '/kor', '/gvi'];
 
-const kodikLinkRegexp = /^(?:https?:|)\/\/(?<host>[a-z0-9]+\.[a-z]+)\/(?<type>[a-z]+)\/(?<id>\d+)\/(?<hash>[0-9a-z]+)\/(?<quality>\d+p)/;
+const kodikLinkRegexp = /^(?:https?:|)\/\/([a-z0-9]+\.[a-z]+)\/([a-z]+)\/(\d+)\/([0-9a-z]+)\/(\d+p)/;
 
 function parseKodikUrl(url: string): KodikParsed | null {
   const match = kodikLinkRegexp.exec(url);
-  if (match?.groups) {
+  if (match) {
     return {
-      host: match.groups.host,
-      type: match.groups.type,
-      id: match.groups.id,
-      hash: match.groups.hash,
-      quality: match.groups.quality,
+      host: match[1],
+      type: match[2],
+      id: match[3],
+      hash: match[4],
+      quality: match[5],
     };
   }
 
