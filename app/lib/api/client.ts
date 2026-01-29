@@ -1,9 +1,5 @@
 const API_BASE = '/api/proxy';
 
-interface RequestOptions extends RequestInit {
-  token?: string;
-}
-
 class ApiClient {
   private baseUrl: string;
 
@@ -13,18 +9,15 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestOptions = {}
+    options: RequestInit = {}
   ): Promise<T> {
-    const { token, ...fetchOptions } = options;
-
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...fetchOptions.headers,
+      ...options.headers,
     };
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...fetchOptions,
+      ...options,
       headers,
     });
 
@@ -40,14 +33,14 @@ class ApiClient {
     return response.json();
   }
 
-  async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+  async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'GET' });
   }
 
   async post<T>(
     endpoint: string,
     data?: unknown,
-    options?: RequestOptions
+    options?: RequestInit
   ): Promise<T> {
     return this.request<T>(endpoint, {
       ...options,
@@ -59,7 +52,7 @@ class ApiClient {
   async put<T>(
     endpoint: string,
     data?: unknown,
-    options?: RequestOptions
+    options?: RequestInit
   ): Promise<T> {
     return this.request<T>(endpoint, {
       ...options,
@@ -68,7 +61,7 @@ class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+  async delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
 }

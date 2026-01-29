@@ -19,10 +19,6 @@ interface TranslationsResponse {
   types: Translation[];
 }
 
-interface EpisodesResponse {
-  code: number;
-  episodes: Episode[];
-}
 
 interface DiscoverResponse {
   code: number;
@@ -99,7 +95,7 @@ interface SourcesResponse {
 }
 
 // Episodes response: /episode/{releaseId}/{typeId}/{sourceId}
-interface EpisodesResponse {
+interface RawEpisodesResponse {
   code: number;
   episodes: Array<{
     position: number;
@@ -177,7 +173,7 @@ export async function getEpisodes(
     cachedSources.set(cacheKey, { sourceId: source.id, episodesCount: source.episodesCount });
 
     // Get actual episodes
-    const response = await apiClient.get<EpisodesResponse>(
+    const response = await apiClient.get<RawEpisodesResponse>(
       `/episode/${animeId}/${typeId}/${source.id}`
     );
 
@@ -215,7 +211,7 @@ export async function getEpisodeUrl(
 
     const sourceId = cachedSources.get(cacheKey)!.sourceId;
 
-    const response = await apiClient.get<EpisodesResponse>(
+    const response = await apiClient.get<RawEpisodesResponse>(
       `/episode/${animeId}/${typeId}/${sourceId}`
     );
 
@@ -231,30 +227,6 @@ export async function getEpisodeUrl(
   }
 }
 
-export async function addToFavorites(
-  animeId: number,
-  token: string
-): Promise<void> {
-  await apiClient.get(`/favorite/add/${animeId}`, { token });
-}
-
-export async function removeFromFavorites(
-  animeId: number,
-  token: string
-): Promise<void> {
-  await apiClient.get(`/favorite/delete/${animeId}`, { token });
-}
-
-export async function getFavorites(
-  token: string,
-  page: number = 0
-): Promise<Anime[]> {
-  const response = await apiClient.get<PaginatedResponse<Anime>>(
-    `/favorite/${page}`,
-    { token }
-  );
-  return response.content || [];
-}
 
 export async function searchAnime(
   query: string,

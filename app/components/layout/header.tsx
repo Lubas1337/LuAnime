@@ -2,20 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, LogOut, Heart, User } from 'lucide-react';
+import { Menu, X, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SearchAutocomplete } from '@/components/search/search-autocomplete';
-import { useAuthStore } from '@/lib/store/auth-store';
-import { useAuthModalStore } from '@/lib/store/auth-modal-store';
 
 const navLinks = [
   { href: '/', label: 'Главная' },
@@ -25,8 +15,6 @@ const navLinks = [
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuthStore();
-  const { open: openAuthModal } = useAuthModalStore();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -62,63 +50,16 @@ export function Header() {
         <div className="flex items-center gap-4">
           <SearchAutocomplete className="hidden md:block" />
 
-          {isAuthenticated && user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.avatar} alt={user.login} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {user.login.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="flex items-center gap-2 p-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar} alt={user.login} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {user.login.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{user.login}</span>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    Профиль
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/profile?tab=favorites" className="cursor-pointer">
-                    <Heart className="mr-2 h-4 w-4" />
-                    Избранное
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Выйти
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="hidden md:flex items-center gap-2">
-              <Button variant="ghost" onClick={() => openAuthModal('login')}>
-                Войти
-              </Button>
-              <Button onClick={() => openAuthModal('register')}>
-                Регистрация
-              </Button>
-            </div>
-          )}
+          <Link
+            href="/profile"
+            className={`relative p-2 rounded-lg transition-all duration-200 hover:bg-primary/10 ${
+              pathname === '/profile'
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Heart className={`h-5 w-5 ${pathname === '/profile' ? 'fill-primary' : ''}`} />
+          </Link>
 
           <Button
             variant="ghost"
@@ -161,31 +102,20 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 animate-fade-in-up flex items-center gap-2 ${
+                  pathname === '/profile'
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground hover:translate-x-1'
+                }`}
+                style={{ animationDelay: '200ms' }}
+              >
+                <Heart className="h-4 w-4" />
+                Избранное
+              </Link>
             </nav>
-
-            {!isAuthenticated && (
-              <div className="flex gap-2 pt-2 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openAuthModal('login');
-                  }}
-                >
-                  Войти
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openAuthModal('register');
-                  }}
-                >
-                  Регистрация
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       )}

@@ -4,6 +4,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Episode, VideoSource, Translation } from '@/types/anime';
 
+interface WatchHistoryEntry {
+  episode: number;
+  progress: number;
+  title?: string;
+  poster?: string;
+  lastWatched?: string;
+}
+
 interface PlayerState {
   currentAnimeId: number | null;
   currentEpisode: Episode | null;
@@ -16,7 +24,7 @@ interface PlayerState {
   volume: number;
   playbackRate: number;
   quality: string;
-  watchHistory: Record<string, { episode: number; progress: number }>;
+  watchHistory: Record<string, WatchHistoryEntry>;
   episodeTimes: Record<string, number>; // "animeId-episode" -> currentTime in seconds
 
   setAnime: (animeId: number) => void;
@@ -30,8 +38,8 @@ interface PlayerState {
   setVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
   setQuality: (quality: string) => void;
-  saveProgress: (animeId: number, episode: number, progress: number) => void;
-  getProgress: (animeId: number) => { episode: number; progress: number } | null;
+  saveProgress: (animeId: number, episode: number, progress: number, title?: string, poster?: string) => void;
+  getProgress: (animeId: number) => WatchHistoryEntry | null;
   saveEpisodeTime: (animeId: number, episode: number, time: number) => void;
   getEpisodeTime: (animeId: number, episode: number) => number | null;
 }
@@ -65,11 +73,18 @@ export const usePlayerStore = create<PlayerState>()(
       setPlaybackRate: (rate) => set({ playbackRate: rate }),
       setQuality: (quality) => set({ quality }),
 
-      saveProgress: (animeId, episode, progress) => {
+      saveProgress: (animeId, episode, progress, title, poster) => {
         set((state) => ({
           watchHistory: {
             ...state.watchHistory,
-            [animeId.toString()]: { episode, progress },
+            [animeId.toString()]: {
+              ...state.watchHistory[animeId.toString()],
+              episode,
+              progress,
+              ...(title && { title }),
+              ...(poster && { poster }),
+              lastWatched: new Date().toISOString(),
+            },
           },
         }));
       },

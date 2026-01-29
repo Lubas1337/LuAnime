@@ -86,30 +86,22 @@ export function Footer() {
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-foreground">Аккаунт</h4>
+            <h4 className="text-sm font-semibold text-foreground">Ещё</h4>
             <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/login"
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  Войти
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/register"
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  Регистрация
-                </Link>
-              </li>
               <li>
                 <Link
                   href="/profile"
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  Профиль
+                  Избранное
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/profile?tab=history"
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  История
                 </Link>
               </li>
             </ul>

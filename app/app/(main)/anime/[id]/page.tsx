@@ -15,10 +15,8 @@ import {
   getTranslations,
   getEpisodes,
 } from '@/lib/api/anime';
-import { useAuthStore } from '@/lib/store/auth-store';
 import { usePlayerStore } from '@/lib/store/player-store';
 import { useFavoritesStore } from '@/lib/store/favorites-store';
-import { useAuthModalStore } from '@/lib/store/auth-modal-store';
 import type { Anime, Episode, Translation } from '@/types/anime';
 import { getImageUrl } from '@/types/anime';
 
@@ -56,10 +54,8 @@ export default function AnimePage({
 
   const playerRef = useRef<HTMLDivElement>(null);
 
-  const { isAuthenticated } = useAuthStore();
   const { saveProgress, getProgress, saveEpisodeTime, getEpisodeTime } = usePlayerStore();
   const { addFavorite, removeFavorite, isFavorite: checkIsFavorite } = useFavoritesStore();
-  const { open: openAuthModal } = useAuthModalStore();
 
   useEffect(() => {
     const fetchAnime = async () => {
@@ -137,18 +133,13 @@ export default function AnimePage({
   };
 
   const handleProgress = (progress: number, currentTime: number) => {
-    if (currentEpisode) {
-      saveProgress(animeId, currentEpisode.number, progress);
+    if (currentEpisode && anime) {
+      saveProgress(animeId, currentEpisode.number, progress, anime.title_ru, anime.image || anime.poster);
       saveEpisodeTime(animeId, currentEpisode.number, currentTime);
     }
   };
 
   const toggleFavorite = () => {
-    if (!isAuthenticated) {
-      openAuthModal('login');
-      return;
-    }
-
     if (isFavorite) {
       removeFavorite(animeId);
     } else {
