@@ -17,6 +17,7 @@ interface PlayerState {
   playbackRate: number;
   quality: string;
   watchHistory: Record<string, { episode: number; progress: number }>;
+  episodeTimes: Record<string, number>; // "animeId-episode" -> currentTime in seconds
 
   setAnime: (animeId: number) => void;
   setEpisode: (episode: Episode) => void;
@@ -31,6 +32,8 @@ interface PlayerState {
   setQuality: (quality: string) => void;
   saveProgress: (animeId: number, episode: number, progress: number) => void;
   getProgress: (animeId: number) => { episode: number; progress: number } | null;
+  saveEpisodeTime: (animeId: number, episode: number, time: number) => void;
+  getEpisodeTime: (animeId: number, episode: number) => number | null;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -48,6 +51,7 @@ export const usePlayerStore = create<PlayerState>()(
       playbackRate: 1,
       quality: 'auto',
       watchHistory: {},
+      episodeTimes: {},
 
       setAnime: (animeId) => set({ currentAnimeId: animeId }),
       setEpisode: (episode) => set({ currentEpisode: episode, progress: 0 }),
@@ -74,6 +78,20 @@ export const usePlayerStore = create<PlayerState>()(
         const { watchHistory } = get();
         return watchHistory[animeId.toString()] || null;
       },
+
+      saveEpisodeTime: (animeId, episode, time) => {
+        set((state) => ({
+          episodeTimes: {
+            ...state.episodeTimes,
+            [`${animeId}-${episode}`]: time,
+          },
+        }));
+      },
+
+      getEpisodeTime: (animeId, episode) => {
+        const { episodeTimes } = get();
+        return episodeTimes[`${animeId}-${episode}`] ?? null;
+      },
     }),
     {
       name: 'player-storage',
@@ -82,6 +100,7 @@ export const usePlayerStore = create<PlayerState>()(
         playbackRate: state.playbackRate,
         quality: state.quality,
         watchHistory: state.watchHistory,
+        episodeTimes: state.episodeTimes,
       }),
     }
   )

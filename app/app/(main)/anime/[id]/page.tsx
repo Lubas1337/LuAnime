@@ -57,7 +57,7 @@ export default function AnimePage({
   const playerRef = useRef<HTMLDivElement>(null);
 
   const { isAuthenticated } = useAuthStore();
-  const { saveProgress, getProgress } = usePlayerStore();
+  const { saveProgress, getProgress, saveEpisodeTime, getEpisodeTime } = usePlayerStore();
   const { addFavorite, removeFavorite, isFavorite: checkIsFavorite } = useFavoritesStore();
   const { open: openAuthModal } = useAuthModalStore();
 
@@ -136,9 +136,10 @@ export default function AnimePage({
     }
   };
 
-  const handleProgress = (progress: number) => {
+  const handleProgress = (progress: number, currentTime: number) => {
     if (currentEpisode) {
       saveProgress(animeId, currentEpisode.number, progress);
+      saveEpisodeTime(animeId, currentEpisode.number, currentTime);
     }
   };
 
@@ -332,6 +333,7 @@ export default function AnimePage({
                         poster={imageUrl}
                         animeTitle={anime.title_ru}
                         episodeNumber={currentEpisode.number}
+                        startTime={getEpisodeTime(animeId, currentEpisode.number) ?? undefined}
                         onEnded={handleNextEpisode}
                         onProgress={handleProgress}
                       />

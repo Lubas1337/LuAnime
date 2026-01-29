@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { usePlayerStore } from '@/lib/store/player-store';
+import { parseKodikUrl } from '@/lib/api/kodik';
 import type { VideoSource } from '@/types/anime';
 
 interface VideoPlayerProps {
@@ -33,8 +34,9 @@ interface VideoPlayerProps {
   poster?: string;
   animeTitle?: string;
   episodeNumber?: number;
+  startTime?: number;
   onEnded?: () => void;
-  onProgress?: (progress: number) => void;
+  onProgress?: (progress: number, currentTime: number) => void;
 }
 
 const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -45,6 +47,7 @@ export function VideoPlayer({
   poster,
   animeTitle,
   episodeNumber,
+  startTime,
   onEnded,
   onProgress,
 }: VideoPlayerProps) {
@@ -64,8 +67,24 @@ export function VideoPlayer({
   const { volume, playbackRate, setVolume, setPlaybackRate } =
     usePlayerStore();
 
+  const [kodikSources, setKodikSources] = useState<VideoSource[]>([]);
+  const [kodikParsing, setKodikParsing] = useState(false);
+  const [kodikFailed, setKodikFailed] = useState(false);
+
+  // Merge original sources with kodik-parsed sources
+  const allSources = kodikSources.length > 0 ? kodikSources : sources;
   const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
-  const currentSource = sources[currentSourceIndex];
+  const currentSource = allSources[currentSourceIndex];
+
+  // Reset kodik state when embed URL changes (new episode)
+  useEffect(() => {
+    setKodikSources([]);
+    setKodikFailed(false);
+    setCurrentSourceIndex(0);
+  }, [embedUrl]);
+
+  const isPlayingRef = useRef(false);
+  isPlayingRef.current = isPlaying;
 
   const initHls = useCallback(
     (source: VideoSource) => {
@@ -73,6 +92,7 @@ export function VideoPlayer({
 
       if (hlsRef.current) {
         hlsRef.current.destroy();
+        hlsRef.current = null;
       }
 
       const video = videoRef.current;
@@ -88,7 +108,7 @@ export function VideoPlayer({
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setIsLoading(false);
-          if (isPlaying) {
+          if (isPlayingRef.current) {
             video.play();
           }
         });
@@ -109,7 +129,7 @@ export function VideoPlayer({
         setIsLoading(false);
       }
     },
-    [isPlaying]
+    [] // no deps — uses ref for isPlaying
   );
 
   useEffect(() => {
@@ -121,6 +141,7 @@ export function VideoPlayer({
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
   }, [currentSource, initHls]);
@@ -236,7 +257,10 @@ export function VideoPlayer({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      onProgress?.(videoRef.current.currentTime / videoRef.current.duration);
+      onProgress?.(
+        videoRef.current.currentTime / videoRef.current.duration,
+        videoRef.current.currentTime
+      );
     }
   };
 
@@ -249,8 +273,60 @@ export function VideoPlayer({
     }
   };
 
-  // If embed URL is provided, show iframe player
-  if (embedUrl) {
+  // Try to parse Kodik embed URL into direct video sources
+  useEffect(() => {
+    if (!embedUrl || kodikSources.length > 0 || kodikFailed) return;
+
+    const isKodik =
+      embedUrl.includes('kodik.') ||
+      embedUrl.includes('aniqit.') ||
+      embedUrl.includes('kodik.info');
+
+    if (!isKodik) return;
+
+    let cancelled = false;
+
+    setKodikParsing(true);
+    parseKodikUrl(embedUrl)
+      .then((parsed) => {
+        if (cancelled) return;
+        if (parsed.length > 0) {
+          setKodikSources(parsed);
+          setCurrentSourceIndex(0);
+        } else {
+          setKodikFailed(true);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err?.name === 'AbortError') return;
+        setKodikFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setKodikParsing(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [embedUrl, kodikSources.length, kodikFailed]);
+
+  // If embed URL is provided and kodik parsing is in progress, show loading
+  if (embedUrl && kodikParsing) {
+    return (
+      <div
+        ref={containerRef}
+        className="video-player-container flex items-center justify-center bg-black"
+      >
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If embed URL is provided and kodik failed (or not a kodik URL), show iframe player
+  if (embedUrl && kodikSources.length === 0) {
     return (
       <div
         ref={containerRef}
@@ -268,7 +344,7 @@ export function VideoPlayer({
   }
 
   // If no sources, show external search options
-  if (sources.length === 0) {
+  if (allSources.length === 0) {
     const searchQuery = encodeURIComponent(
       `${animeTitle || 'anime'} ${episodeNumber ? `серия ${episodeNumber}` : ''}`
     );
@@ -340,6 +416,10 @@ export function VideoPlayer({
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
+            if (startTime && startTime > 0 && startTime < videoRef.current.duration) {
+              videoRef.current.currentTime = startTime;
+              setCurrentTime(startTime);
+            }
           }
         }}
         onWaiting={() => setIsLoading(true)}
@@ -476,11 +556,11 @@ export function VideoPlayer({
                   </DropdownMenuItem>
                 ))}
 
-                {sources.length > 1 && (
+                {allSources.length > 1 && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>Качество</DropdownMenuLabel>
-                    {sources.map((source, index) => (
+                    {allSources.map((source, index) => (
                       <DropdownMenuItem
                         key={index}
                         onClick={() => setCurrentSourceIndex(index)}
