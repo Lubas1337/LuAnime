@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>mobile.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>1</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>B844A5A1E0C7CC5D6401FD6BC8F97644AE37743D</string>
+				<key>dateExpires</key>
+				<string>27.09.2026</string>
+				<key>type</key>
+				<string>Apple Development</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>87HSTK5T7Y.kz.lubas.mobile</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>87HSTK5T7Y</string>
+				<key>get-task-allow</key>
+				<true/>
+			</dict>
+			<key>name</key>
+			<string>mobile.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>c838c181-6823-48fc-b8f7-855c4daae7cb</string>
+				<key>dateExpires</key>
+				<string>04.02.2026</string>
+				<key>name</key>
+				<string>iOS Team Provisioning Profile: kz.lubas.mobile</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>87HSTK5T7Y</string>
+				<key>name</key>
+				<string></string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>

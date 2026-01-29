@@ -1,0 +1,115 @@
+2026-01-28 15:15:34 +0000 [MT] Initial pipeline context: <IDEDistributionProcessingPipelineContext: 0x71b051800; archive(resolved)="<IDEArchive: 0x71be8f560>", distributionTask(resolved)="2", distributionDestination(resolved)="1", distributionMethod(resolved)="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team(resolved)="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	Chain (14, self inclusive):
+	<IDEDistributionProcessingPipelineContext: 0x71b051800; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionProcessingPipelineContext: 0x71b051500; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da82300; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da81400; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da81180; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da80f00; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da80c80; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da80a00; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da80780; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="<IDEProvisioningBasicTeam: 0x71d9dc860; teamID='87HSTK5T7Y', teamName='(null)'>">
+	<IDEDistributionContext: 0x71da80500; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="(null)">
+	<IDEDistributionContext: 0x71da80280; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="(null)">
+	<IDEDistributionContext: 0x71da80000; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="(null)">
+	<IDEDistributionContext: 0x102e401f0; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x71d3d8e90>", team="(null)">
+	<IDEDistributionContext: 0x102e3e6f0; archive = "<IDEArchive: 0x71be8f560>", distributionMethod="(null)", team="(null)">
+</IDEDistributionProcessingPipelineContext: 0x71b051800>
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionCreateDestRootStep
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionCopyItemStep
+2026-01-28 15:15:34 +0000 [MT] Running /usr/bin/ditto '-V' '/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app' '/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root/Payload/mobile.app'
+2026-01-28 15:15:34 +0000  >>> Copying /Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app 
+2026-01-28 15:15:34 +0000  copying file ./_CodeSignature/CodeResources ... 
+2026-01-28 15:15:34 +0000  2111 bytes for ./_CodeSignature/CodeResources
+2026-01-28 15:15:34 +0000  copying file ./mobile ... 
+2026-01-28 15:15:34 +0000  1003184 bytes for ./mobile
+2026-01-28 15:15:34 +0000  copying file ./embedded.mobileprovision ... 
+2026-01-28 15:15:34 +0000  12240 bytes for ./embedded.mobileprovision
+2026-01-28 15:15:34 +0000  copying file ./Info.plist ... 
+2026-01-28 15:15:34 +0000  1235 bytes for ./Info.plist
+2026-01-28 15:15:34 +0000  copying file ./PkgInfo ... 
+2026-01-28 15:15:34 +0000  8 bytes for ./PkgInfo
+2026-01-28 15:15:34 +0000 [MT] /usr/bin/ditto exited with 0
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionEmbedProfileStep
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionInfoPlistStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionInfoPlistStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionAppThinningPlistStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionAppThinningPlistStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionSymbolsStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionSymbolsStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionAppThinningStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionArchThinningStep
+2026-01-28 15:15:34 +0000 [MT] Archs to thin for item /Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app are []
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionODRStep
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionStripXattrsStep
+2026-01-28 15:15:34 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionCodesignStep
+2026-01-28 15:15:34 +0000 [MT] Entitlements for <IDEDistributionItem: 0x71da90000; bundleID='kz.lubas.mobile', path='<DVTFilePath:0x71d9aab20:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x71d044540; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x71d95f240; name='Apple Development: abylailuba@gmail.com (QD3K5956KN)', hash='B844A5A1E0C7CC5D6401FD6BC8F97644AE37743D', serialNumber='2F50142DF012150A95216D2EB64F5DAF', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-09-27 11:53:18 +0000''>', entitlements='{
+    "application-identifier" = "87HSTK5T7Y.kz.lubas.mobile";
+    "com.apple.developer.team-identifier" = 87HSTK5T7Y;
+    "get-task-allow" = 1;
+}', teamID='87HSTK5T7Y', identifier='kz.lubas.mobile', executablePath='<DVTFilePath:0x71d9abe40:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app/mobile'>', hardenedRuntime='0'>'>: {
+    "application-identifier" = "87HSTK5T7Y.kz.lubas.mobile";
+    "com.apple.developer.team-identifier" = 87HSTK5T7Y;
+    "get-task-allow" = 1;
+}
+2026-01-28 15:15:34 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
+2026-01-28 15:15:34 +0000 [MT] Entitlements for <IDEDistributionItem: 0x71da90000; bundleID='kz.lubas.mobile', path='<DVTFilePath:0x71d9aab20:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x71d044540; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x71d95eac0; name='Apple Development: abylailuba@gmail.com (QD3K5956KN)', hash='B844A5A1E0C7CC5D6401FD6BC8F97644AE37743D', serialNumber='2F50142DF012150A95216D2EB64F5DAF', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-09-27 11:53:18 +0000''>', entitlements='{
+    "application-identifier" = "87HSTK5T7Y.kz.lubas.mobile";
+    "com.apple.developer.team-identifier" = 87HSTK5T7Y;
+    "get-task-allow" = 1;
+}', teamID='87HSTK5T7Y', identifier='kz.lubas.mobile', executablePath='<DVTFilePath:0x71d9abe40:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app/mobile'>', hardenedRuntime='0'>'> are: {
+    "application-identifier" = "87HSTK5T7Y.kz.lubas.mobile";
+    "com.apple.developer.team-identifier" = 87HSTK5T7Y;
+    "get-task-allow" = 1;
+}
+2026-01-28 15:15:34 +0000 [MT] Writing entitlements for <IDEDistributionItem: 0x71da90000; bundleID='kz.lubas.mobile', path='<DVTFilePath:0x71d9aab20:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x71d044540; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x71d95eac0; name='Apple Development: abylailuba@gmail.com (QD3K5956KN)', hash='B844A5A1E0C7CC5D6401FD6BC8F97644AE37743D', serialNumber='2F50142DF012150A95216D2EB64F5DAF', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-09-27 11:53:18 +0000''>', entitlements='{
+    "application-identifier" = "87HSTK5T7Y.kz.lubas.mobile";
+    "com.apple.developer.team-identifier" = 87HSTK5T7Y;
+    "get-task-allow" = 1;
+}', teamID='87HSTK5T7Y', identifier='kz.lubas.mobile', executablePath='<DVTFilePath:0x71d9abe40:'/Users/abylay/WebstormProjects/LuAnime/mobile/build/mobile.xcarchive/Products/Applications/mobile.app/mobile'>', hardenedRuntime='0'>'> to: /var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/entitlements~~~NT3hXx
+2026-01-28 15:15:34 +0000 [MT] invoking codesign: <NSConcreteTask: 0x71b1f0e10; launchPath='/usr/bin/codesign', arguments='(
+    "-f",
+    "-s",
+    B844A5A1E0C7CC5D6401FD6BC8F97644AE37743D,
+    "--entitlements",
+    "/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/entitlements~~~NT3hXx",
+    "--preserve-metadata=identifier,flags,runtime,launch-constraints,library-constraints",
+    "--generate-entitlement-der",
+    "--strip-disallowed-xattrs",
+    "-vvv",
+    "/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root/Payload/mobile.app"
+)'>
+2026-01-28 15:15:34 +0000 [MT] codesign output: /var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root/Payload/mobile.app: replacing existing signature
+/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root/Payload/mobile.app: signed app bundle with Mach-O thin (arm64) [kz.lubas.mobile]
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionZipODRItemStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionZipODRItemStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionCreateIPAStep
+2026-01-28 15:15:34 +0000 [MT] Running /usr/bin/ditto '-V' '-c' '-k' '--norsrc' '/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root' '/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Packages/mobile.ipa'
+2026-01-28 15:15:34 +0000  >>> Copying /var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root 
+2026-01-28 15:15:34 +0000  copying file ./Payload/mobile.app/_CodeSignature/CodeResources ... 
+2026-01-28 15:15:34 +0000  2111 bytes for ./Payload/mobile.app/_CodeSignature/CodeResources
+2026-01-28 15:15:34 +0000  copying file ./Payload/mobile.app/mobile ... 
+2026-01-28 15:15:34 +0000  1003184 bytes for ./Payload/mobile.app/mobile
+2026-01-28 15:15:34 +0000  copying file ./Payload/mobile.app/embedded.mobileprovision ... 
+2026-01-28 15:15:34 +0000  12240 bytes for ./Payload/mobile.app/embedded.mobileprovision
+copying file ./Payload/mobile.app/Info.plist ... 
+2026-01-28 15:15:34 +0000  1235 bytes for ./Payload/mobile.app/Info.plist
+copying file ./Payload/mobile.app/PkgInfo ... 
+2026-01-28 15:15:34 +0000  8 bytes for ./Payload/mobile.app/PkgInfo
+2026-01-28 15:15:34 +0000 [MT] /usr/bin/ditto exited with 0
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionAppStoreInformationStep
+2026-01-28 15:15:34 +0000 [MT] Skipping step: IDEDistributionAppStoreInformationStep because it said so
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionGenerateProcessedDistributionItems
+2026-01-28 15:15:34 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x71e014120:'/var/folders/mm/99wcqghx0t15nmhzn7gc9nsh0000gn/T/XcodeDistPipeline.~~~6EEiO8/Root/Payload/mobile.app'>
+2026-01-28 15:15:34 +0000 [MT] Processing step: IDEDistributionCreateManifestStep
