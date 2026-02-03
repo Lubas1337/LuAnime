@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/luanime
+  IMAGE_NAME: lubas1337/luanime
 
 jobs:
   build-and-deploy:
