@@ -1,11 +1,11 @@
-FROM node:20-alpine AS base
+FROM oven/bun:1-alpine AS base
 
 # --- Dependencies ---
 FROM base AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile
 
 # --- Build ---
 FROM base AS builder
@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN npm run build
+RUN bun run build
 
 # --- Production ---
 FROM base AS runner
@@ -35,4 +35,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["bun", "server.js"]

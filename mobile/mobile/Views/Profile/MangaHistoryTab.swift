@@ -1,19 +1,19 @@
 //
-//  HistoryTab.swift
+//  MangaHistoryTab.swift
 //  mobile
 //
-//  LuAnime iOS App - History Tab
+//  LuAnime iOS App - Manga History Tab
 //
 
 import SwiftUI
 
-struct HistoryTab: View {
-    @State private var playerStore = PlayerStore.shared
-    @Binding var selectedAnime: Anime?
+struct MangaHistoryTab: View {
+    @State private var mangaStore = MangaStore.shared
+    @Binding var selectedManga: Manga?
 
     var body: some View {
         Group {
-            if playerStore.watchHistory.isEmpty {
+            if mangaStore.readingHistory.isEmpty {
                 emptyState
             } else {
                 historyList
@@ -27,11 +27,11 @@ struct HistoryTab: View {
                 .font(.system(size: 48))
                 .foregroundStyle(AppColors.textTertiary)
 
-            Text("No Watch History")
+            Text("No Reading History")
                 .font(.headline)
                 .foregroundStyle(.white)
 
-            Text("Start watching anime to build your history")
+            Text("Start reading manga to build your history")
                 .font(.subheadline)
                 .foregroundStyle(AppColors.textSecondary)
         }
@@ -50,21 +50,21 @@ struct HistoryTab: View {
 
                 Button("Clear All") {
                     withAnimation {
-                        playerStore.clearHistory()
+                        mangaStore.clearHistory()
                     }
                 }
                 .font(.subheadline)
                 .foregroundStyle(AppColors.textSecondary)
             }
 
-            ForEach(playerStore.getRecentHistoryGroupedByAnime()) { item in
-                HistoryRow(item: item) {
-                    if let anime = item.anime {
-                        selectedAnime = anime
+            ForEach(mangaStore.getRecentHistoryGroupedByManga()) { item in
+                MangaHistoryRow(item: item) {
+                    if let manga = item.manga {
+                        selectedManga = manga
                     }
                 } onRemove: {
                     withAnimation {
-                        playerStore.removeAnimeFromHistory(animeId: item.animeId)
+                        mangaStore.removeMangaFromHistory(mangaId: item.mangaId)
                     }
                 }
             }
@@ -72,8 +72,8 @@ struct HistoryTab: View {
     }
 }
 
-struct HistoryRow: View {
-    let item: WatchHistoryItem
+struct MangaHistoryRow: View {
+    let item: MangaReadingProgress
     var onTap: (() -> Void)?
     var onRemove: (() -> Void)?
 
@@ -82,7 +82,7 @@ struct HistoryRow: View {
             onTap?()
         } label: {
             HStack(spacing: 12) {
-                if let posterURL = item.anime?.posterURL ?? item.anime?.imageURL {
+                if let posterURL = item.manga?.posterURL {
                     AsyncImage(url: posterURL) { phase in
                         switch phase {
                         case .success(let image):
@@ -99,15 +99,17 @@ struct HistoryRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(item.anime?.displayTitle ?? "Anime #\(item.animeId)")
+                    Text(item.manga?.displayTitle ?? "Manga")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.white)
                         .lineLimit(1)
 
                     HStack(spacing: 8) {
-                        Text("Episode \(item.episodeNumber)")
-                            .foregroundStyle(AppColors.primary)
+                        if let chapterNumber = item.chapterNumber {
+                            Text("Ch. \(chapterNumber)")
+                                .foregroundStyle(AppColors.primary)
+                        }
 
                         Text("\(Int(item.progress * 100))%")
                             .foregroundStyle(AppColors.textSecondary)
@@ -141,7 +143,7 @@ struct HistoryRow: View {
         AppGradients.background
             .ignoresSafeArea()
 
-        HistoryTab(selectedAnime: .constant(nil))
+        MangaHistoryTab(selectedManga: .constant(nil))
             .padding()
     }
 }

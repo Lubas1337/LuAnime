@@ -2,7 +2,7 @@
 //  SearchView.swift
 //  mobile
 //
-//  LuAnime iOS App - Search View (iOS 26 Phone App Style - 1:1)
+//  LuAnime iOS App - Search View
 //
 
 import SwiftUI
@@ -10,152 +10,48 @@ import SwiftUI
 struct SearchView: View {
     @State private var searchText = ""
     @State private var searchResults: [Anime] = []
-    @State private var isSearching = false
+    @State private var isLoadingResults = false
     @State private var hasSearched = false
     @State private var error: String?
     @State private var selectedAnime: Anime?
     @State private var recentSearches: [String] = []
-    @State private var isSearchActive = false
+    @State private var isSearchFieldActive = false
     @State private var searchTask: Task<Void, Never>?
-
-    @FocusState private var isSearchFocused: Bool
 
     private let recentSearchesKey = "recent_searches"
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AppGradients.background
-                    .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    // iOS 26 Phone App Style Header
-                    phoneStyleHeader
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
-
-                    // Content
-                    contentView
-                }
+            SearchableContainer(isSearchFieldActive: $isSearchFieldActive) {
+                contentView
+            }
+            .navigationTitle("Search")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search anime..."
+            )
+            .onSubmit(of: .search) {
+                search()
             }
             .navigationDestination(item: $selectedAnime) { anime in
                 AnimeDetailView(anime: anime)
             }
-            .onAppear {
-                loadRecentSearches()
-            }
-            .onChange(of: searchText) { _, newValue in
-                debouncedSearch(newValue)
-            }
         }
-    }
-
-    // MARK: - Phone App Style Header (Title + Search Icon → Expands to Search Bar)
-
-    private var phoneStyleHeader: some View {
-        ZStack {
-            // Collapsed State: Title on left, Search icon on right
-            if !isSearchActive {
-                HStack {
-                    Text("Search")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-
-                    Spacer()
-
-                    // Search Icon Button
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isSearchActive = true
-                        }
-                        // Delay focus to allow animation to start
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            isSearchFocused = true
-                        }
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                }
-                .transition(.opacity)
-            }
-
-            // Expanded State: Full-width Search Bar
-            if isSearchActive {
-                HStack(spacing: 12) {
-                    // Search Field - Full Width
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        TextField("Search", text: $searchText)
-                            .font(.body)
-                            .foregroundStyle(.white)
-                            .focused($isSearchFocused)
-                            .onSubmit(search)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-
-                        if !searchText.isEmpty {
-                            Button {
-                                searchTask?.cancel()
-                                searchText = ""
-                                searchResults = []
-                                hasSearched = false
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(AppColors.textTertiary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .iOS26SearchFieldStyle()
-
-                    // Cancel Button
-                    Button {
-                        searchTask?.cancel()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isSearchActive = false
-                            isSearchFocused = false
-                            searchText = ""
-                            searchResults = []
-                            hasSearched = false
-                            error = nil
-                        }
-                    } label: {
-                        Text("Cancel")
-                            .font(.body)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .opacity
-                ))
-            }
+        .onAppear { loadRecentSearches() }
+        .onChange(of: searchText) { _, newValue in
+            debouncedSearch(newValue)
         }
-        .frame(height: 44)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSearchActive)
     }
 
     @ViewBuilder
     private var contentView: some View {
-        if isSearchActive && searchText.isEmpty {
+        if isSearchFieldActive && searchText.isEmpty {
             recentSearchesView
-        } else if isSearching {
+        } else if isLoadingResults {
             LoadingView(message: "Searching...")
-        } else if let error = error {
-            ErrorView(message: error) {
-                search()
-            }
+        } else if let error {
+            ErrorView(message: error) { search() }
         } else if !searchResults.isEmpty {
             resultsView
         } else if hasSearched && searchResults.isEmpty {
@@ -168,18 +64,17 @@ struct SearchView: View {
     private var defaultView: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Suggestions or trending could go here
                 VStack(spacing: 16) {
                     Image(systemName: "sparkle.magnifyingglass")
                         .font(.system(size: 64, weight: .thin))
                         .foregroundStyle(AppColors.primary.opacity(0.5))
 
-                    Text("Tap search to find anime")
+                    Text("Search for anime")
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 100)
+                .padding(.top, 40)
             }
         }
     }
@@ -220,7 +115,6 @@ struct SearchView: View {
                     .liquidGlass(cornerRadius: 12)
                     .padding(.horizontal)
                 } else {
-                    // No recent searches
                     VStack(spacing: 12) {
                         Image(systemName: "clock")
                             .font(.system(size: 32))
@@ -231,7 +125,7 @@ struct SearchView: View {
                             .foregroundStyle(AppColors.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 60)
+                    .padding(.top, 24)
                 }
             }
             .padding(.top, 8)
@@ -261,6 +155,8 @@ struct SearchView: View {
         }
     }
 
+    // MARK: - Search Logic
+
     private func debouncedSearch(_ query: String) {
         searchTask?.cancel()
 
@@ -273,9 +169,9 @@ struct SearchView: View {
         }
 
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
+            try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
-            await performSearch(query: trimmed, dismissKeyboard: false)
+            await performSearch(query: trimmed)
         }
     }
 
@@ -285,21 +181,15 @@ struct SearchView: View {
         guard !trimmed.isEmpty else { return }
 
         Task {
-            await performSearch(query: trimmed, dismissKeyboard: true)
+            await performSearch(query: trimmed)
             await saveToRecentSearchesAsync(trimmed)
         }
     }
 
-    private func performSearch(query: String, dismissKeyboard: Bool) async {
+    private func performSearch(query: String) async {
         await MainActor.run {
-            isSearching = true
+            isLoadingResults = true
             error = nil
-        }
-
-        if dismissKeyboard {
-            await MainActor.run {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            }
         }
 
         do {
@@ -308,13 +198,13 @@ struct SearchView: View {
             await MainActor.run {
                 searchResults = results
                 hasSearched = true
-                isSearching = false
+                isLoadingResults = false
             }
         } catch {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.error = error.localizedDescription
-                isSearching = false
+                isLoadingResults = false
             }
         }
     }
@@ -339,6 +229,25 @@ struct SearchView: View {
     private func clearRecentSearches() {
         recentSearches = []
         UserDefaults.standard.removeObject(forKey: recentSearchesKey)
+    }
+}
+
+// MARK: - Searchable Container (bridges @Environment(\.isSearching) to binding)
+
+struct SearchableContainer<Content: View>: View {
+    @Binding var isSearchFieldActive: Bool
+    @Environment(\.isSearching) private var isSearching
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ZStack {
+            AppGradients.background
+                .ignoresSafeArea()
+            content()
+        }
+        .onChange(of: isSearching) { _, newValue in
+            isSearchFieldActive = newValue
+        }
     }
 }
 

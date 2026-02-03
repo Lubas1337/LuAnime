@@ -72,7 +72,6 @@ struct MangaHomeView: View {
                     }
                 }
 
-                Spacer(minLength: 100)
             }
             .padding(.top)
         }

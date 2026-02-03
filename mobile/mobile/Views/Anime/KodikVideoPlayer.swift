@@ -155,6 +155,18 @@ struct EpisodePlayerView: View {
         isLoading = true
         error = nil
 
+        // Check for offline version first
+        if let localURL = DownloadStore.shared.getLocalURL(animeId: anime.id, episodeNumber: episode.episodeNumber) {
+            resolvedURL = localURL
+            // Restore saved progress for offline playback too
+            if let savedProgress = playerStore.getProgress(animeId: anime.id, episodeNumber: episode.episodeNumber),
+               savedProgress > 0.01 && savedProgress < 0.95, savedSeekTime < 1 {
+                savedSeekTime = -savedProgress
+            }
+            isLoading = false
+            return
+        }
+
         guard let url = episodeURL else {
             error = "No video source available"
             isLoading = false

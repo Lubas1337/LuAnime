@@ -158,7 +158,8 @@ struct MangaReaderView: View {
 
     private func pageView(segment: ChapterSegment, index: Int) -> some View {
         let pageImage = segment.pages.pageImages[index]
-        let aspectRatio = CGFloat(pageImage.width) / CGFloat(max(pageImage.height, 1))
+        let rawAspectRatio = CGFloat(pageImage.width) / CGFloat(max(pageImage.height, 1))
+        let aspectRatio = rawAspectRatio > 0 ? rawAspectRatio : 0.7
 
         return MangaPageView(
             urlString: pageImage.link,
@@ -331,6 +332,26 @@ struct MangaReaderView: View {
         isLoading = true
         error = nil
 
+        // Check for offline download first
+        if let downloaded = MangaDownloadStore.shared.getDownloadedChapter(mangaId: manga.id, chapterId: chapter.id) {
+            let localPages = (0..<downloaded.pageCount).map { i in
+                ChapterPages.PageImage(
+                    link: downloaded.pageURL(index: i)!.absoluteString,
+                    height: 0, width: 0
+                )
+            }
+            let chapterPages = ChapterPages(
+                pageImages: localPages,
+                serverLink: "",
+                fallbackLink: nil,
+                previousChapterId: nil,
+                nextChapterId: nil
+            )
+            segments = [ChapterSegment(id: chapter.id, chapter: chapter, pages: chapterPages)]
+            isLoading = false
+            return
+        }
+
         do {
             let pages = try await ReMangaService.shared.getChapterPages(chapterId: chapter.id)
             segments = [ChapterSegment(id: chapter.id, chapter: chapter, pages: pages)]
@@ -349,6 +370,26 @@ struct MangaReaderView: View {
         guard !next.isPaid else { return }
 
         isLoadingNext = true
+
+        // Check for offline download first
+        if let downloaded = MangaDownloadStore.shared.getDownloadedChapter(mangaId: manga.id, chapterId: next.id) {
+            let localPages = (0..<downloaded.pageCount).map { i in
+                ChapterPages.PageImage(
+                    link: downloaded.pageURL(index: i)!.absoluteString,
+                    height: 0, width: 0
+                )
+            }
+            let chapterPages = ChapterPages(
+                pageImages: localPages,
+                serverLink: "",
+                fallbackLink: nil,
+                previousChapterId: nil,
+                nextChapterId: nil
+            )
+            segments.append(ChapterSegment(id: next.id, chapter: next, pages: chapterPages))
+            isLoadingNext = false
+            return
+        }
 
         Task {
             do {
@@ -397,6 +438,12 @@ private enum MangaImageLoader {
     }()
 
     static func loadImage(urlString: String) async -> UIImage? {
+        // Fast path for local file:// URLs (offline pages)
+        if urlString.hasPrefix("file://"), let url = URL(string: urlString),
+           let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+            return image
+        }
+
         // Try original URL first
         if let image = await fetchImage(urlString: urlString) {
             return image

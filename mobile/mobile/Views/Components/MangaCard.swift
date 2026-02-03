@@ -65,26 +65,34 @@ struct MangaCardCompact: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AnimePosterImage(
-                url: manga.posterURL,
-                cornerRadius: 12
-            )
-            .frame(width: 80, height: 110)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(manga.displayTitle)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-
-                if let typeName = manga.typeName {
-                    Text(typeName)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .lineLimit(1)
+            if let posterURL = manga.posterURL {
+                AsyncImage(url: posterURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    default:
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.surface)
+                    }
                 }
+                .frame(width: 50, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
 
-                HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(manga.displayTitle)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    if let typeName = manga.typeName {
+                        Text(typeName)
+                    }
+
                     if let status = manga.status {
                         HStack(spacing: 4) {
                             Circle()
@@ -92,22 +100,25 @@ struct MangaCardCompact: View {
                                 .frame(width: 6, height: 6)
                             Text(manga.statusDisplay)
                         }
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
                     }
 
                     if let year = manga.year {
                         Text(String(year))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
                     }
                 }
+                .font(.caption)
+                .foregroundStyle(AppColors.textSecondary)
             }
 
             Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(AppColors.textTertiary)
         }
         .padding(12)
-        .liquidGlass(cornerRadius: AppConstants.Layout.cornerRadius)
+        .background(AppColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func statusColor(_ status: String) -> Color {

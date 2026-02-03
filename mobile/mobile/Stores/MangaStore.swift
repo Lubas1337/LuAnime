@@ -93,6 +93,23 @@ final class MangaStore {
         saveHistory()
     }
 
+    func removeMangaFromHistory(mangaId: String) {
+        readingHistory.removeAll { $0.mangaId == mangaId }
+        saveHistory()
+    }
+
+    func getRecentHistoryGroupedByManga(limit: Int = 20) -> [MangaReadingProgress] {
+        var seen = Set<String>()
+        var result: [MangaReadingProgress] = []
+        for item in readingHistory.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            if seen.insert(item.mangaId).inserted {
+                result.append(item)
+            }
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
     var chaptersRead: Int {
         readingHistory.filter(\.isCompleted).count
     }

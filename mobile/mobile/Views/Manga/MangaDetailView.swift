@@ -19,6 +19,7 @@ struct MangaDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let mangaStore = MangaStore.shared
+    private let mangaDownloadStore = MangaDownloadStore.shared
 
     /// Use detailedManga (with branchId, genres, description) if available, otherwise the passed-in manga
     private var displayManga: Manga {
@@ -117,7 +118,6 @@ struct MangaDetailView: View {
 
             chaptersSection
 
-            Spacer(minLength: 100)
         }
         .padding(.horizontal)
         .padding(.top, -60)
@@ -257,6 +257,19 @@ struct MangaDetailView: View {
 
                 Spacer()
 
+                if !chapters.isEmpty {
+                    Button {
+                        mangaDownloadStore.downloadAllChapters(
+                            manga: displayManga,
+                            chapters: chapters.filter { !$0.isPaid }
+                        )
+                    } label: {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.title3)
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
+
                 if isLoading {
                     ProgressView()
                         .tint(AppColors.primary)
@@ -312,6 +325,9 @@ struct MangaDetailView: View {
 
                 Spacer()
 
+                // Download status indicator
+                chapterDownloadIndicator(chapter)
+
                 // Progress indicator
                 if let progress = mangaStore.getProgress(mangaId: displayManga.id, chapterId: chapter.id) {
                     if progress.isCompleted {
@@ -332,6 +348,45 @@ struct MangaDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if mangaDownloadStore.isDownloaded(mangaId: displayManga.id, chapterId: chapter.id) {
+                Button(role: .destructive) {
+                    mangaDownloadStore.deleteDownload(mangaId: displayManga.id, chapterId: chapter.id)
+                } label: {
+                    Label("Delete Download", systemImage: "trash")
+                }
+            } else if !chapter.isPaid {
+                Button {
+                    mangaDownloadStore.downloadChapter(manga: displayManga, chapter: chapter)
+                } label: {
+                    Label("Download", systemImage: "arrow.down.circle")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chapterDownloadIndicator(_ chapter: Chapter) -> some View {
+        let key = "\(displayManga.id)-\(chapter.id)"
+        if mangaDownloadStore.isDownloaded(mangaId: displayManga.id, chapterId: chapter.id) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.caption)
+                .foregroundStyle(AppColors.success)
+        } else if let task = mangaDownloadStore.activeDownloads[key] {
+            switch task.status {
+            case .waiting:
+                Image(systemName: "clock")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textTertiary)
+            case .downloading:
+                CircularProgressView(progress: task.progress)
+                    .frame(width: 16, height: 16)
+            case .failed:
+                Image(systemName: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.error)
+            }
+        }
     }
 
     private func statusColorValue(_ status: String) -> Color {

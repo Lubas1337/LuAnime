@@ -10,144 +10,48 @@ import SwiftUI
 struct MangaSearchView: View {
     @State private var searchText = ""
     @State private var searchResults: [Manga] = []
-    @State private var isSearching = false
+    @State private var isLoadingResults = false
     @State private var hasSearched = false
     @State private var error: String?
     @State private var selectedManga: Manga?
     @State private var recentSearches: [String] = []
-    @State private var isSearchActive = false
+    @State private var isSearchFieldActive = false
     @State private var searchTask: Task<Void, Never>?
-
-    @FocusState private var isSearchFocused: Bool
 
     private let recentSearchesKey = "manga_recent_searches"
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AppGradients.background
-                    .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    phoneStyleHeader
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
-
-                    contentView
-                }
+            SearchableContainer(isSearchFieldActive: $isSearchFieldActive) {
+                contentView
+            }
+            .navigationTitle("Search")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search manga..."
+            )
+            .onSubmit(of: .search) {
+                search()
             }
             .navigationDestination(item: $selectedManga) { manga in
                 MangaDetailView(manga: manga)
             }
-            .onAppear {
-                loadRecentSearches()
-            }
-            .onChange(of: searchText) { _, newValue in
-                debouncedSearch(newValue)
-            }
         }
-    }
-
-    // MARK: - Phone App Style Header
-
-    private var phoneStyleHeader: some View {
-        ZStack {
-            if !isSearchActive {
-                HStack {
-                    Text("Search Manga")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-
-                    Spacer()
-
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isSearchActive = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            isSearchFocused = true
-                        }
-                    } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                }
-                .transition(.opacity)
-            }
-
-            if isSearchActive {
-                HStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        TextField("Search manga...", text: $searchText)
-                            .font(.body)
-                            .foregroundStyle(.white)
-                            .focused($isSearchFocused)
-                            .onSubmit(search)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-
-                        if !searchText.isEmpty {
-                            Button {
-                                searchTask?.cancel()
-                                searchText = ""
-                                searchResults = []
-                                hasSearched = false
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(AppColors.textTertiary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .iOS26SearchFieldStyle()
-
-                    Button {
-                        searchTask?.cancel()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isSearchActive = false
-                            isSearchFocused = false
-                            searchText = ""
-                            searchResults = []
-                            hasSearched = false
-                            error = nil
-                        }
-                    } label: {
-                        Text("Cancel")
-                            .font(.body)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .opacity
-                ))
-            }
+        .onAppear { loadRecentSearches() }
+        .onChange(of: searchText) { _, newValue in
+            debouncedSearch(newValue)
         }
-        .frame(height: 44)
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSearchActive)
     }
 
     @ViewBuilder
     private var contentView: some View {
-        if isSearchActive && searchText.isEmpty {
+        if isSearchFieldActive && searchText.isEmpty {
             recentSearchesView
-        } else if isSearching {
+        } else if isLoadingResults {
             LoadingView(message: "Searching...")
         } else if let error {
-            ErrorView(message: error) {
-                search()
-            }
+            ErrorView(message: error) { search() }
         } else if !searchResults.isEmpty {
             resultsView
         } else if hasSearched && searchResults.isEmpty {
@@ -165,12 +69,12 @@ struct MangaSearchView: View {
                         .font(.system(size: 64, weight: .thin))
                         .foregroundStyle(AppColors.primary.opacity(0.5))
 
-                    Text("Tap search to find manga")
+                    Text("Search for manga")
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 100)
+                .padding(.top, 40)
             }
         }
     }
@@ -221,7 +125,7 @@ struct MangaSearchView: View {
                             .foregroundStyle(AppColors.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 60)
+                    .padding(.top, 24)
                 }
             }
             .padding(.top, 8)
@@ -267,7 +171,7 @@ struct MangaSearchView: View {
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
-            await performSearch(query: trimmed, dismissKeyboard: false)
+            await performSearch(query: trimmed)
         }
     }
 
@@ -277,21 +181,15 @@ struct MangaSearchView: View {
         guard !trimmed.isEmpty else { return }
 
         Task {
-            await performSearch(query: trimmed, dismissKeyboard: true)
+            await performSearch(query: trimmed)
             saveToRecentSearches(trimmed)
         }
     }
 
-    private func performSearch(query: String, dismissKeyboard: Bool) async {
+    private func performSearch(query: String) async {
         await MainActor.run {
-            isSearching = true
+            isLoadingResults = true
             error = nil
-        }
-
-        if dismissKeyboard {
-            await MainActor.run {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            }
         }
 
         do {
@@ -300,13 +198,13 @@ struct MangaSearchView: View {
             await MainActor.run {
                 searchResults = results
                 hasSearched = true
-                isSearching = false
+                isLoadingResults = false
             }
         } catch {
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.error = error.localizedDescription
-                isSearching = false
+                isLoadingResults = false
             }
         }
     }

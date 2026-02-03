@@ -69,33 +69,42 @@ struct FavoriteRow: View {
             onTap?()
         } label: {
             HStack(spacing: 12) {
-                AnimePosterImage(
-                    url: anime.posterURL ?? anime.imageURL,
-                    cornerRadius: 12
-                )
-                .frame(width: 70, height: 100)
+                if let posterURL = anime.posterURL ?? anime.imageURL {
+                    AsyncImage(url: posterURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        default:
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(AppColors.surface)
+                        }
+                    }
+                    .frame(width: 50, height: 70)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(anime.displayTitle)
-                        .font(.headline)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundStyle(.white)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         if let rating = anime.grade, rating > 0 {
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill")
                                     .foregroundStyle(AppColors.rating)
                                 Text(String(format: "%.1f", rating))
                             }
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
                         }
 
                         Text(anime.episodesInfo + " ep.")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
                     }
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
                 }
 
                 Spacer()
@@ -104,12 +113,13 @@ struct FavoriteRow: View {
                     onRemove?()
                 } label: {
                     Image(systemName: "heart.fill")
-                        .font(.title3)
+                        .font(.subheadline)
                         .foregroundStyle(AppColors.error)
                 }
             }
             .padding(12)
-            .liquidGlass(cornerRadius: AppConstants.Layout.cornerRadius)
+            .background(AppColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }

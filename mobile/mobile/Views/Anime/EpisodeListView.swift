@@ -9,10 +9,12 @@ import SwiftUI
 
 struct EpisodeListView: View {
     let episodes: [Episode]
+    let animeId: Int
     var selectedEpisode: Episode?
     var onSelect: ((Episode) -> Void)?
 
     private let playerStore = PlayerStore.shared
+    private let downloadStore = DownloadStore.shared
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -22,9 +24,11 @@ struct EpisodeListView: View {
                         episode: episode,
                         isSelected: selectedEpisode?.position == episode.position,
                         progress: playerStore.getProgress(
-                            animeId: playerStore.currentAnime?.id ?? 0,
+                            animeId: animeId,
                             episodeNumber: episode.episodeNumber
-                        )
+                        ),
+                        isDownloaded: downloadStore.isDownloaded(animeId: animeId, episodeNumber: episode.episodeNumber),
+                        downloadProgress: downloadStore.downloadProgress(animeId: animeId, episodeNumber: episode.episodeNumber)
                     ) {
                         onSelect?(episode)
                     }
@@ -38,7 +42,19 @@ struct EpisodeCard: View {
     let episode: Episode
     var isSelected: Bool = false
     var progress: Double?
+    var isDownloaded: Bool = false
+    var downloadProgress: Double?
     var onTap: (() -> Void)?
+
+    private var cardBackground: Color {
+        if isSelected {
+            return AppColors.primary
+        } else if isDownloaded {
+            return AppColors.success.opacity(0.35)
+        } else {
+            return AppColors.surface
+        }
+    }
 
     var body: some View {
         Button {
@@ -46,9 +62,22 @@ struct EpisodeCard: View {
         } label: {
             VStack(spacing: 8) {
                 ZStack {
+                    // Base background
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? AppColors.primary : AppColors.surface)
+                        .fill(cardBackground)
                         .frame(width: 80, height: 80)
+
+                    // Download progress fill: green fills from bottom up
+                    if let downloadProgress = downloadProgress, !isSelected, !isDownloaded {
+                        VStack {
+                            Spacer()
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.success.opacity(0.3))
+                                .frame(height: 80 * downloadProgress)
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
 
                     VStack(spacing: 4) {
                         Image(systemName: "play.fill")

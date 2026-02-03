@@ -103,6 +103,23 @@ final class PlayerStore {
         saveHistory()
     }
 
+    func removeAnimeFromHistory(animeId: Int) {
+        watchHistory.removeAll { $0.animeId == animeId }
+        saveHistory()
+    }
+
+    func getRecentHistoryGroupedByAnime(limit: Int = 20) -> [WatchHistoryItem] {
+        var seen = Set<Int>()
+        var result: [WatchHistoryItem] = []
+        for item in watchHistory.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            if seen.insert(item.animeId).inserted {
+                result.append(item)
+            }
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
     // MARK: - Player State
 
     func setCurrentPlayback(anime: Anime, episode: Episode, translation: Translation?, source: VideoSource?) {

@@ -28,6 +28,7 @@ struct AnimeDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let favoritesStore = FavoritesStore.shared
+    private let downloadStore = DownloadStore.shared
 
     var body: some View {
         ZStack {
@@ -117,7 +118,6 @@ struct AnimeDetailView: View {
                 episodeSection
             }
 
-            Spacer(minLength: 100)
         }
         .padding(.horizontal)
         .padding(.top, -60)
@@ -142,6 +142,33 @@ struct AnimeDetailView: View {
                 }
 
                 Spacer()
+
+                // Download button for current episode
+                if let ep = selectedEpisode {
+                    if downloadStore.isDownloaded(animeId: anime.id, episodeNumber: ep.episodeNumber) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(AppColors.success)
+                    } else if let progress = downloadStore.downloadProgress(animeId: anime.id, episodeNumber: ep.episodeNumber) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                            Circle()
+                                .trim(from: 0, to: progress)
+                                .stroke(AppColors.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .frame(width: 22, height: 22)
+                    } else {
+                        Button {
+                            downloadEpisode(ep)
+                        } label: {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.title3)
+                                .foregroundStyle(AppColors.primary)
+                        }
+                    }
+                }
 
                 // Close player button
                 Button {
@@ -359,10 +386,30 @@ struct AnimeDetailView: View {
                     ProgressView()
                         .tint(AppColors.primary)
                 }
+
+                // Download All button
+                if !episodes.isEmpty {
+                    Button {
+                        downloadAllEpisodes()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.caption)
+                            Text("All")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(AppColors.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.primary.opacity(0.15))
+                        .clipShape(Capsule())
+                    }
+                }
             }
 
             EpisodeListView(
                 episodes: episodes,
+                animeId: anime.id,
                 selectedEpisode: selectedEpisode
             ) { episode in
                 // Reset quality state for new episode
@@ -371,6 +418,27 @@ struct AnimeDetailView: View {
                 selectedEpisode = episode
             }
         }
+    }
+
+    // MARK: - Download Actions
+
+    private func downloadEpisode(_ episode: Episode) {
+        guard let url = episode.url else { return }
+        downloadStore.downloadEpisode(
+            anime: anime,
+            episode: episode,
+            kodikURL: url,
+            quality: selectedQuality
+        )
+    }
+
+    private func downloadAllEpisodes() {
+        let downloadableEpisodes = episodes.filter { $0.url != nil }
+        downloadStore.downloadAllEpisodes(
+            anime: anime,
+            episodes: downloadableEpisodes,
+            quality: selectedQuality
+        )
     }
 
     // MARK: - Data Loading

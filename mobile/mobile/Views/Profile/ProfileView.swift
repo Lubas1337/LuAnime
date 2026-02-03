@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @State private var selectedTab: ProfileTab = .favorites
+    private let downloadStore = DownloadStore.shared
+    private let mangaDownloadStore = MangaDownloadStore.shared
 
     var body: some View {
         NavigationStack {
@@ -19,14 +20,26 @@ struct ProfileView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         statsSection
-                        tabSection
-                        contentSection
-                        Spacer(minLength: 100)
+
+                        if !downloadStore.activeDownloads.isEmpty || !downloadStore.downloadedEpisodes.isEmpty {
+                            downloadsSection
+                        }
+
+                        if !mangaDownloadStore.activeDownloads.isEmpty || !mangaDownloadStore.downloadedChapters.isEmpty {
+                            mangaDownloadsSection
+                        }
+
                     }
                     .padding()
                 }
             }
             .navigationTitle("Profile")
+            .navigationDestination(for: DownloadedAnimeDestination.self) { destination in
+                DownloadedAnimeView(anime: destination.anime, episodes: destination.episodes)
+            }
+            .navigationDestination(for: DownloadedMangaDestination.self) { destination in
+                DownloadedMangaView(manga: destination.manga, chapters: destination.chapters)
+            }
         }
     }
 
@@ -34,7 +47,7 @@ struct ProfileView: View {
         HStack(spacing: 16) {
             StatCard(
                 icon: "heart.fill",
-                value: "\(FavoritesStore.shared.favorites.count)",
+                value: "\(FavoritesStore.shared.favorites.count + MangaStore.shared.favorites.count)",
                 label: "Favorites",
                 color: AppColors.error
             )
@@ -47,61 +60,261 @@ struct ProfileView: View {
             )
 
             StatCard(
-                icon: "book.fill",
-                value: "\(MangaStore.shared.chaptersRead)",
-                label: "Chapters",
+                icon: "arrow.down.circle.fill",
+                value: "\(downloadStore.downloadedEpisodes.count + mangaDownloadStore.downloadedChapters.count)",
+                label: "Downloaded",
                 color: AppColors.success
             )
         }
     }
 
-    private var tabSection: some View {
-        HStack(spacing: 0) {
-            ForEach(ProfileTab.allCases, id: \.self) { tab in
-                Button {
-                    withAnimation(.smoothSpring) {
-                        selectedTab = tab
-                    }
-                } label: {
-                    VStack(spacing: 8) {
-                        Text(tab.title)
-                            .font(.subheadline)
-                            .fontWeight(selectedTab == tab ? .semibold : .regular)
-                            .foregroundStyle(selectedTab == tab ? .white : AppColors.textSecondary)
+    private var downloadsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Downloads")
+                    .font(.headline)
+                    .foregroundStyle(.white)
 
-                        Rectangle()
-                            .fill(selectedTab == tab ? AppColors.primary : .clear)
-                            .frame(height: 2)
-                    }
+                Spacer()
+
+                if downloadStore.totalStorageUsed > 0 {
+                    Text(downloadStore.totalStorageFormatted)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
                 }
-                .frame(maxWidth: .infinity)
+            }
+
+            // Active downloads
+            if !downloadStore.activeDownloads.isEmpty {
+                ForEach(Array(downloadStore.activeDownloads.values).sorted(by: { $0.id < $1.id })) { task in
+                    activeDownloadRow(task)
+                }
+            }
+
+            // Completed downloads grouped by anime
+            let groups = downloadStore.episodesGroupedByAnime()
+            ForEach(groups, id: \.anime.id) { group in
+                NavigationLink(
+                    value: DownloadedAnimeDestination(anime: group.anime, episodes: group.episodes)
+                ) {
+                    downloadedAnimeRow(anime: group.anime, episodes: group.episodes)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    @ViewBuilder
-    private var contentSection: some View {
-        switch selectedTab {
-        case .favorites:
-            FavoritesTab()
-        case .history:
-            HistoryTab()
+    private func activeDownloadRow(_ task: DownloadTask) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle")
+                .font(.title3)
+                .foregroundStyle(AppColors.primary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.anime?.displayTitle ?? "Episode \(task.episodeNumber)")
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text("Episode \(task.episodeNumber)")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            switch task.status {
+            case .waiting:
+                Text("Waiting")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            case .downloading:
+                ProgressView(value: task.progress)
+                    .progressViewStyle(.linear)
+                    .tint(AppColors.primary)
+                    .frame(width: 60)
+            case .failed(let error):
+                Text("Failed")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.error)
+            }
         }
+        .padding(12)
+        .background(AppColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func downloadedAnimeRow(anime: Anime, episodes: [DownloadedEpisode]) -> some View {
+        HStack(spacing: 12) {
+            if let posterURL = anime.posterURL {
+                AsyncImage(url: posterURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    default:
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.surface)
+                    }
+                }
+                .frame(width: 50, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(anime.displayTitle)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                let totalSize = episodes.reduce(Int64(0)) { $0 + $1.fileSize }
+                Text("\(episodes.count) ep. \u{2022} \(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(AppColors.textTertiary)
+        }
+        .padding(12)
+        .background(AppColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Manga Downloads Section
+
+    private var mangaDownloadsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Manga Downloads")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                if mangaDownloadStore.totalStorageUsed > 0 {
+                    Text(mangaDownloadStore.totalStorageFormatted)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+
+            // Active manga downloads
+            if !mangaDownloadStore.activeDownloads.isEmpty {
+                ForEach(Array(mangaDownloadStore.activeDownloads.values).sorted(by: { $0.id < $1.id })) { task in
+                    activeMangaDownloadRow(task)
+                }
+            }
+
+            // Completed downloads grouped by manga
+            let groups = mangaDownloadStore.chaptersGroupedByManga()
+            ForEach(groups, id: \.manga.id) { group in
+                NavigationLink(
+                    value: DownloadedMangaDestination(manga: group.manga, chapters: group.chapters)
+                ) {
+                    downloadedMangaRow(manga: group.manga, chapters: group.chapters)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func activeMangaDownloadRow(_ task: MangaDownloadTask) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle")
+                .font(.title3)
+                .foregroundStyle(AppColors.primary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.manga?.displayTitle ?? "Manga")
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(task.chapterDisplayName)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            switch task.status {
+            case .waiting:
+                Text("Waiting")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            case .downloading:
+                ProgressView(value: task.progress)
+                    .progressViewStyle(.linear)
+                    .tint(AppColors.primary)
+                    .frame(width: 60)
+            case .failed:
+                Text("Failed")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.error)
+            }
+        }
+        .padding(12)
+        .background(AppColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func downloadedMangaRow(manga: Manga, chapters: [DownloadedChapter]) -> some View {
+        HStack(spacing: 12) {
+            if let posterURL = manga.posterURL {
+                AsyncImage(url: posterURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    default:
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(AppColors.surface)
+                    }
+                }
+                .frame(width: 50, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(manga.displayTitle)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                let totalSize = chapters.reduce(Int64(0)) { $0 + $1.fileSize }
+                Text("\(chapters.count) ch. \u{2022} \(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(AppColors.textTertiary)
+        }
+        .padding(12)
+        .background(AppColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
-// MARK: - Supporting Types
+struct DownloadedMangaDestination: Hashable {
+    let manga: Manga
+    let chapters: [DownloadedChapter]
+}
 
-enum ProfileTab: CaseIterable {
-    case favorites
-    case history
-
-    var title: String {
-        switch self {
-        case .favorites: return "Favorites"
-        case .history: return "History"
-        }
-    }
+struct DownloadedAnimeDestination: Hashable {
+    let anime: Anime
+    let episodes: [DownloadedEpisode]
 }
 
 struct StatCard: View {

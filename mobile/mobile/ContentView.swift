@@ -31,7 +31,7 @@ struct ContentView: View {
                     homeContent
                 }
 
-                Tab(TabItem.search.title, systemImage: selectedTab == .search ? TabItem.search.selectedIcon : TabItem.search.icon, value: .search) {
+                Tab(TabItem.search.title, systemImage: selectedTab == .search ? TabItem.search.selectedIcon : TabItem.search.icon, value: .search, role: .search) {
                     searchContent
                 }
 
@@ -95,6 +95,18 @@ struct ContentView: View {
     }
 }
 
+enum FavoritesSubTab: CaseIterable {
+    case favorites
+    case history
+
+    var title: String {
+        switch self {
+        case .favorites: return "Favorites"
+        case .history: return "History"
+        }
+    }
+}
+
 struct FavoritesView: View {
     @State private var favoritesStore = FavoritesStore.shared
     @State private var mangaStore = MangaStore.shared
@@ -102,6 +114,7 @@ struct FavoritesView: View {
     @State private var selectedAnime: Anime?
     @State private var selectedManga: Manga?
     @State private var selectedSection: AppModeStore.AppMode = .anime
+    @State private var selectedSubTab: FavoritesSubTab = .favorites
 
     var body: some View {
         NavigationStack {
@@ -118,10 +131,25 @@ struct FavoritesView: View {
                     .pickerStyle(.segmented)
                     .padding()
 
-                    if selectedSection == .anime {
+                    // Favorites/History sub-tab picker
+                    subTabPicker
+
+                    // Content
+                    switch (selectedSection, selectedSubTab) {
+                    case (.anime, .favorites):
                         animeFavorites
-                    } else {
+                    case (.anime, .history):
+                        ScrollView {
+                            HistoryTab(selectedAnime: $selectedAnime)
+                                .padding()
+                        }
+                    case (.manga, .favorites):
                         mangaFavorites
+                    case (.manga, .history):
+                        ScrollView {
+                            MangaHistoryTab(selectedManga: $selectedManga)
+                                .padding()
+                        }
                     }
                 }
             }
@@ -133,6 +161,31 @@ struct FavoritesView: View {
                 MangaDetailView(manga: manga)
             }
         }
+    }
+
+    private var subTabPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(FavoritesSubTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.smoothSpring) {
+                        selectedSubTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        Text(tab.title)
+                            .font(.subheadline)
+                            .fontWeight(selectedSubTab == tab ? .semibold : .regular)
+                            .foregroundStyle(selectedSubTab == tab ? .white : AppColors.textSecondary)
+
+                        Rectangle()
+                            .fill(selectedSubTab == tab ? AppColors.primary : .clear)
+                            .frame(height: 2)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
     }
 
     @ViewBuilder

@@ -22,6 +22,8 @@ enum AppConstants {
         static let mangaFavoritesKey = "manga_favorites"
         static let mangaHistoryKey = "manga_reading_history"
         static let appModeKey = "app_mode"
+        static let downloadedEpisodesKey = "downloaded_episodes"
+        static let downloadedMangaChaptersKey = "downloaded_manga_chapters"
     }
 
     enum ReManga {
