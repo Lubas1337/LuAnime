@@ -155,12 +155,33 @@ export function VideoPlayer({
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(
+        !!document.fullscreenElement || !!(document as any).webkitFullscreenElement
+      );
     };
 
+    // iOS video fullscreen events
+    const handleIOSFullscreenBegin = () => setIsFullscreen(true);
+    const handleIOSFullscreenEnd = () => setIsFullscreen(false);
+
+    const video = videoRef.current;
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    // iOS-specific video fullscreen events
+    if (video) {
+      video.addEventListener('webkitbeginfullscreen', handleIOSFullscreenBegin);
+      video.addEventListener('webkitendfullscreen', handleIOSFullscreenEnd);
+    }
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      if (video) {
+        video.removeEventListener('webkitbeginfullscreen', handleIOSFullscreenBegin);
+        video.removeEventListener('webkitendfullscreen', handleIOSFullscreenEnd);
+      }
     };
   }, []);
 
@@ -209,12 +230,29 @@ export function VideoPlayer({
   };
 
   const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
+    const video = videoRef.current;
+    const container = containerRef.current;
+    if (!container || !video) return;
+
+    // Check if we're on iOS (Safari doesn't support container fullscreen)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (isFullscreen) {
-      await document.exitFullscreen();
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
     } else {
-      await containerRef.current.requestFullscreen();
+      // On iOS, use video's webkitEnterFullscreen
+      if (isIOS && (video as any).webkitEnterFullscreen) {
+        (video as any).webkitEnterFullscreen();
+      } else if (container.requestFullscreen) {
+        await container.requestFullscreen();
+      } else if ((container as any).webkitRequestFullscreen) {
+        (container as any).webkitRequestFullscreen();
+      }
     }
   };
 
