@@ -58,6 +58,8 @@ interface MoviePlayerProps {
   players: PlayerInfo[];
   translations?: Translation[];
   kinopoiskId?: number;
+  season?: number;
+  episode?: number;
   poster?: string;
   movieTitle?: string;
   isLoading?: boolean;
@@ -70,6 +72,8 @@ export function MoviePlayer({
   players,
   translations = [],
   kinopoiskId,
+  season,
+  episode,
   poster,
   movieTitle,
   isLoading: externalLoading,
@@ -367,9 +371,11 @@ export function MoviePlayer({
       const currentPos = videoRef.current?.currentTime || 0;
       const wasPlaying = isPlayingRef.current;
 
-      const response = await fetch(
-        `/api/kinobox/stream?kp=${kinopoiskId}&translation=${encodeURIComponent(String(translation.id))}`
-      );
+      let url = `/api/kinobox/stream?kp=${kinopoiskId}&translation=${encodeURIComponent(String(translation.id))}`;
+      if (season !== undefined) url += `&season=${season}`;
+      if (episode !== undefined) url += `&episode=${episode}`;
+
+      const response = await fetch(url);
 
       if (!response.ok) {
         console.error('Failed to fetch translation stream:', response.status);

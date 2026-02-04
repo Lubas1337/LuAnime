@@ -32,9 +32,38 @@ interface Translation {
   source: string;
 }
 
+interface CollapsEpisode {
+  episode: string;
+  hls: string;
+  dash?: string;
+  title?: string;
+  audio?: {
+    names: string[];
+    order: number[];
+  };
+}
+
+interface CollapsSeason {
+  season: number;
+  episodes: CollapsEpisode[];
+}
+
+interface CollapsData {
+  source?: {
+    hls: string;
+    audio?: {
+      names: string[];
+      order: number[];
+    };
+  };
+  playlist?: {
+    seasons: CollapsSeason[];
+  };
+  title?: string;
+}
+
 // Convert m3u8 URL to proxy URL for CORS bypass
 function getProxiedUrl(url: string): string {
-  // Use our proxy endpoint to bypass CORS
   return `/api/proxy/m3u8?url=${encodeURIComponent(url)}`;
 }
 
@@ -63,8 +92,68 @@ function cleanStreamUrl(url: string): string {
     .replace(/\\/g, '');
 }
 
-// Parse Collaps embed directly (most reliable method)
-async function parseCollapsDirectly(
+// Parse makePlayer({...}) from Collaps HTML response
+function parseCollapsData(html: string): CollapsData | null {
+  try {
+    // Remove newlines for easier matching
+    const cleanHtml = html.replace(/\n/g, '');
+
+    // Find makePlayer({...});
+    const match = cleanHtml.match(/makePlayer\(\{([\s\S]*?)\}\);/);
+    if (!match) return null;
+
+    // Use Function constructor to safely evaluate the object
+    // eslint-disable-next-line no-new-func
+    const data = new Function('return ({' + match[1] + '})')();
+    return data as CollapsData;
+  } catch (error) {
+    console.error('Failed to parse Collaps data:', error);
+    return null;
+  }
+}
+
+// Fetch Collaps page and parse data
+async function fetchCollapsData(
+  kinopoiskId: number,
+  audioIndex?: number,
+  season?: number,
+  episode?: number
+): Promise<{ data: CollapsData | null; html: string }> {
+  try {
+    let url = `${COLLAPS_API}${kinopoiskId}`;
+    const params: string[] = [];
+
+    if (audioIndex !== undefined) params.push(`audio=${audioIndex}`);
+    if (season !== undefined) params.push(`season=${season}`);
+    if (episode !== undefined) params.push(`episode=${episode}`);
+
+    if (params.length > 0) {
+      url += '?' + params.join('&');
+    }
+
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://flcksbr.xyz/',
+      },
+    });
+
+    if (!response.ok) {
+      return { data: null, html: '' };
+    }
+
+    const html = await response.text();
+    const data = parseCollapsData(html);
+
+    return { data, html };
+  } catch (error) {
+    console.error('Failed to fetch Collaps data:', error);
+    return { data: null, html: '' };
+  }
+}
+
+// Get direct video stream for a movie or series episode
+export async function getMovieStream(
   kinopoiskId: number,
   season?: number,
   episode?: number
@@ -72,70 +161,51 @@ async function parseCollapsDirectly(
   const streams: VideoStream[] = [];
 
   try {
-    // Build URL with optional season/episode parameters
-    let url = `${COLLAPS_API}${kinopoiskId}`;
-    if (season && episode) {
-      url += `?season=${season}&episode=${episode}`;
+    const { data } = await fetchCollapsData(kinopoiskId, undefined, season, episode);
+
+    if (!data) {
+      return streams;
     }
 
-    const response = await fetchWithTimeout(
-      url,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://flcksbr.xyz/',
-        },
-      }
-    );
-
-    if (!response.ok) return streams;
-
-    const html = await response.text();
-
-    // Extract HLS URL from the makePlayer options (format: hls: "url")
-    const hlsMatch = html.match(/hls:\s*["']([^"']+)["']/);
-    if (hlsMatch) {
-      const hlsUrl = cleanStreamUrl(hlsMatch[1]);
-
-      // Try to extract translation info
-      const translationMatch = html.match(/audios:\s*\[([^\]]*)\]/);
-      let translation = 'Дублированный';
-      if (translationMatch) {
-        const nameMatch = translationMatch[1].match(/name:\s*["']([^"']+)["']/);
-        if (nameMatch) translation = nameMatch[1];
-      }
+    // For movies - use source.hls
+    if (data.source?.hls) {
+      const audioNames = data.source.audio?.names || [];
+      const firstAudio = audioNames[0] || 'Дублированный';
 
       streams.push({
-        url: getProxiedUrl(hlsUrl),
+        url: getProxiedUrl(cleanStreamUrl(data.source.hls)),
         quality: 'auto',
-        translation,
+        translation: firstAudio,
         source: 'Collaps',
       });
     }
 
-    // Also look for direct m3u8 URLs in the page
-    const m3u8Matches = html.matchAll(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/g);
-    for (const match of m3u8Matches) {
-      const url = cleanStreamUrl(match[0]);
-      const proxiedUrl = getProxiedUrl(url);
-      // Avoid duplicates
-      if (!streams.some(s => s.url === proxiedUrl)) {
-        streams.push({
-          url: proxiedUrl,
-          quality: 'auto',
-          translation: 'Дублированный',
-          source: 'Collaps',
-        });
+    // For series - use playlist.seasons[].episodes[]
+    if (data.playlist?.seasons && season !== undefined && episode !== undefined) {
+      const seasonData = data.playlist.seasons.find(s => s.season === season);
+      if (seasonData) {
+        const episodeData = seasonData.episodes.find(e => parseInt(e.episode) === episode);
+        if (episodeData?.hls) {
+          const audioNames = episodeData.audio?.names || [];
+          const firstAudio = audioNames[0] || 'Дублированный';
+
+          streams.push({
+            url: getProxiedUrl(cleanStreamUrl(episodeData.hls)),
+            quality: 'auto',
+            translation: firstAudio,
+            source: 'Collaps',
+          });
+        }
       }
     }
   } catch (error) {
-    console.error('Failed to parse Collaps directly:', error);
+    console.error('Failed to get Collaps streams:', error);
   }
 
   return streams;
 }
 
-// Get list of available players from Kinobox
+// Get list of available players from Kinobox (fallback)
 export async function getKinoboxPlayers(
   kinopoiskId: number,
   season?: number,
@@ -147,15 +217,12 @@ export async function getKinoboxPlayers(
       url += `&season=${season}&episode=${episode}`;
     }
 
-    const response = await fetchWithTimeout(
-      url,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://flcksbr.xyz/',
-        },
-      }
-    );
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://flcksbr.xyz/',
+      },
+    });
 
     if (!response.ok) {
       return [];
@@ -167,223 +234,6 @@ export async function getKinoboxPlayers(
     console.error('Failed to get Kinobox players:', error);
     return [];
   }
-}
-
-// Parse Collaps/Variyt embed to get direct stream URL
-async function parseCollapsStream(iframeUrl: string): Promise<VideoStream | null> {
-  try {
-    const response = await fetchWithTimeout(iframeUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-      },
-    });
-
-    const html = await response.text();
-
-    // Try to extract HLS URL from makePlayer options first
-    const hlsMatch = html.match(/hls:\s*["']([^"']+)["']/);
-    if (hlsMatch) {
-      const hlsUrl = cleanStreamUrl(hlsMatch[1]);
-      return {
-        url: hlsUrl.includes('.m3u8') ? getProxiedUrl(hlsUrl) : hlsUrl,
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Collaps',
-      };
-    }
-
-    // Fallback: Find m3u8 or mp4 URL directly in the page
-    const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
-    const mp4Match = html.match(/https?:\/\/[^"'\s\\]+\.mp4[^"'\s\\]*/);
-
-    const url = m3u8Match?.[0] || mp4Match?.[0];
-    if (!url) return null;
-
-    const cleanedUrl = cleanStreamUrl(url);
-    return {
-      url: cleanedUrl.includes('.m3u8') ? getProxiedUrl(cleanedUrl) : cleanedUrl,
-      quality: 'auto',
-      translation: 'Дублированный',
-      source: 'Collaps',
-    };
-  } catch (error) {
-    console.error('Failed to parse Collaps stream:', error);
-    return null;
-  }
-}
-
-// Parse Alloha embed to get video ID and fetch stream URL
-async function parseAllohaStream(iframeUrl: string): Promise<VideoStream | null> {
-  try {
-    const response = await fetchWithTimeout(iframeUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-      },
-    });
-
-    const html = await response.text();
-
-    // Check for error page
-    if (html.includes('Ошибка') || html.includes('контент не найден')) {
-      return null;
-    }
-
-    // Try to find direct m3u8 URL first
-    const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
-    if (m3u8Match) {
-      return {
-        url: getProxiedUrl(cleanStreamUrl(m3u8Match[0])),
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Alloha',
-      };
-    }
-
-    // Try to extract video ID from fileList and fetch stream URL
-    const fileListMatch = html.match(/fileList\s*=\s*JSON\.parse\('([^']+)'\)/);
-    const tokenMatch = html.match(/token:\s*['"]([^'"]+)['"]/);
-    const movieIdMatch = html.match(/movie\s*=\s*\{[^}]*id:\s*['"]([^'"]+)['"]/);
-
-    if (fileListMatch && tokenMatch && movieIdMatch) {
-      try {
-        const fileList = JSON.parse(fileListMatch[1].replace(/\\'/g, "'"));
-        const token = tokenMatch[1];
-        const movieId = movieIdMatch[1];
-
-        // Get the active video ID
-        const videoId = fileList.active?.id;
-        if (videoId) {
-          // Try to fetch stream from Alloha API
-          const streamUrl = await fetchAllohaStreamUrl(videoId, token, movieId);
-          if (streamUrl) {
-            return {
-              url: streamUrl.includes('.m3u8') ? getProxiedUrl(streamUrl) : streamUrl,
-              quality: fileList.active?.quality || 'HD',
-              translation: fileList.active?.translation || 'Дублированный',
-              source: 'Alloha',
-            };
-          }
-        }
-      } catch {
-        console.error('Failed to parse Alloha fileList');
-      }
-    }
-
-    // Fallback: try to find stream URL in JSON data
-    const jsonMatch = html.match(/"file"\s*:\s*"([^"]+\.m3u8[^"]*)"/);
-    if (jsonMatch) {
-      return {
-        url: getProxiedUrl(cleanStreamUrl(jsonMatch[1])),
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Alloha',
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Failed to parse Alloha stream:', error);
-    return null;
-  }
-}
-
-// Try to fetch stream URL from Alloha API (this may not work if API is protected)
-async function fetchAllohaStreamUrl(videoId: number, token: string, movieId: string): Promise<string | null> {
-  try {
-    // Try common Alloha API patterns
-    const baseUrl = 'https://theatre.stloadi.live';
-
-    // Attempt 1: Direct file endpoint
-    const response = await fetchWithTimeout(
-      `${baseUrl}/api/file/${videoId}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': baseUrl,
-          'X-Token': token,
-        },
-      },
-      5000
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.url) return cleanStreamUrl(data.url);
-      if (data.file) return cleanStreamUrl(data.file);
-    }
-  } catch {
-    // API endpoint not found or protected
-  }
-
-  return null;
-}
-
-// Get direct video stream for a movie or series episode
-export async function getMovieStream(
-  kinopoiskId: number,
-  season?: number,
-  episode?: number
-): Promise<VideoStream[]> {
-  const streams: VideoStream[] = [];
-
-  // Method 1: Try Collaps direct API first (most reliable, no ads)
-  try {
-    const collapsStreams = await parseCollapsDirectly(kinopoiskId, season, episode);
-    if (collapsStreams.length > 0) {
-      streams.push(...collapsStreams);
-    }
-  } catch (error) {
-    console.error('Failed to get Collaps streams:', error);
-  }
-
-  // If we already have streams, return them
-  if (streams.length > 0) {
-    return streams;
-  }
-
-  // Method 2: Try Kinobox API for other players
-  const players = await getKinoboxPlayers(kinopoiskId, season, episode);
-
-  if (players.length === 0) {
-    return streams;
-  }
-
-  // Try each player in order of preference
-  for (const player of players) {
-    if (!player.iframeUrl) continue;
-
-    let stream: VideoStream | null = null;
-
-    try {
-      if (player.type === 'Collaps' || player.iframeUrl.includes('variyt') || player.iframeUrl.includes('delivembd')) {
-        stream = await parseCollapsStream(player.iframeUrl);
-      } else if (player.type === 'Alloha' || player.iframeUrl.includes('alloha') || player.iframeUrl.includes('stloadi')) {
-        stream = await parseAllohaStream(player.iframeUrl);
-      }
-
-      if (stream) {
-        // Update translation from player data if available
-        const translation = player.translations?.[0];
-        if (translation?.name) {
-          stream.translation = translation.name;
-        }
-        if (translation?.quality) {
-          stream.quality = translation.quality;
-        }
-
-        // Avoid duplicates
-        if (!streams.some(s => s.url === stream!.url)) {
-          streams.push(stream);
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to parse ${player.type}:`, error);
-    }
-  }
-
-  return streams;
 }
 
 // Get all available players with their iframe URLs (for fallback)
@@ -409,7 +259,7 @@ export async function getMoviePlayers(
     }));
 }
 
-// Get all available translations for a movie
+// Get all available translations for a movie or episode
 export async function getAvailableTranslations(
   kinopoiskId: number,
   season?: number,
@@ -417,65 +267,46 @@ export async function getAvailableTranslations(
 ): Promise<Translation[]> {
   const translations: Translation[] = [];
 
-  // Get translations from Collaps API directly
   try {
-    let url = `${COLLAPS_API}${kinopoiskId}`;
-    if (season && episode) {
-      url += `?season=${season}&episode=${episode}`;
+    const { data } = await fetchCollapsData(kinopoiskId, undefined, season, episode);
+
+    if (!data) {
+      return translations;
     }
 
-    const response = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-      },
-    });
+    let audioData: { names: string[]; order: number[] } | undefined;
 
-    if (response.ok) {
-      const html = await response.text();
+    // For movies - get audio from source
+    if (data.source?.audio) {
+      audioData = data.source.audio;
+    }
 
-      // New format: audio: {"names":["..."], "order":[...]}
-      const audioMatch = html.match(/audio:\s*(\{"names":\[.*?\],"order":\[.*?\]\})/);
-      if (audioMatch) {
-        try {
-          const audioData = JSON.parse(audioMatch[1]);
-          if (audioData.names && Array.isArray(audioData.names)) {
-            // Use order array if available, otherwise use natural order
-            const order = audioData.order || audioData.names.map((_: string, i: number) => i);
-
-            for (const idx of order) {
-              const name = audioData.names[idx];
-              // Skip invalid entries like "delete"
-              if (name && name !== 'delete' && !name.toLowerCase().includes('delete')) {
-                translations.push({
-                  id: String(idx), // Index is the audio ID
-                  name: name,
-                  quality: 'HD',
-                  source: 'Collaps',
-                });
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse audio JSON:', e);
+    // For series - get audio from first episode or specified episode
+    if (data.playlist?.seasons) {
+      if (season !== undefined && episode !== undefined) {
+        const seasonData = data.playlist.seasons.find(s => s.season === season);
+        const episodeData = seasonData?.episodes.find(e => parseInt(e.episode) === episode);
+        if (episodeData?.audio) {
+          audioData = episodeData.audio;
         }
+      } else if (data.playlist.seasons[0]?.episodes[0]?.audio) {
+        // Use first episode's audio as reference
+        audioData = data.playlist.seasons[0].episodes[0].audio;
       }
+    }
 
-      // Fallback: try old format audios: [{...}]
-      if (translations.length === 0) {
-        const audiosMatch = html.match(/audios:\s*\[([^\]]+)\]/);
-        if (audiosMatch) {
-          const audioRegex = /\{\s*name:\s*["']([^"']+)["'][^}]*\}/g;
-          let match;
-          let idx = 0;
-          while ((match = audioRegex.exec(audiosMatch[1])) !== null) {
-            translations.push({
-              id: String(idx++),
-              name: match[1],
-              quality: 'HD',
-              source: 'Collaps',
-            });
-          }
+    if (audioData?.names) {
+      const order = audioData.order || audioData.names.map((_, i) => i);
+
+      for (const idx of order) {
+        const name = audioData.names[idx];
+        if (name && !name.toLowerCase().includes('delete')) {
+          translations.push({
+            id: String(idx),
+            name: name,
+            quality: 'HD',
+            source: 'Collaps',
+          });
         }
       }
     }
@@ -492,135 +323,60 @@ export async function getAvailableTranslations(
   });
 }
 
-// Parse a specific translation by audio ID using Collaps API
+// Get stream for specific translation (audio track)
 export async function parseTranslationStream(
   audioId: string,
   kinopoiskId?: number,
   season?: number,
   episode?: number
 ): Promise<VideoStream | null> {
-  console.log('Parsing translation stream for audio:', audioId, 'kp:', kinopoiskId);
-
-  // If audioId looks like a URL (legacy), try to parse it directly
-  if (audioId.startsWith('http')) {
-    return parseTranslationUrl(audioId);
-  }
-
-  // Use Collaps API with audio parameter
   if (!kinopoiskId) {
-    console.error('kinopoiskId required for audio-based translation');
+    console.error('kinopoiskId required for translation stream');
     return null;
   }
 
   try {
-    let url = `${COLLAPS_API}${kinopoiskId}?audio=${audioId}`;
-    if (season && episode) {
-      url += `&season=${season}&episode=${episode}`;
-    }
+    const audioIndex = parseInt(audioId, 10);
+    const { data } = await fetchCollapsData(kinopoiskId, audioIndex, season, episode);
 
-    console.log('Fetching Collaps with audio:', url);
-
-    const response = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('Collaps fetch failed:', response.status);
+    if (!data) {
+      console.error('No data from Collaps for translation');
       return null;
     }
 
-    const html = await response.text();
+    let hlsUrl: string | undefined;
+    let audioNames: string[] = [];
 
-    // Extract HLS URL
-    const hlsMatch = html.match(/hls:\s*["']([^"']+)["']/);
-    if (hlsMatch) {
-      const hlsUrl = cleanStreamUrl(hlsMatch[1]);
+    // For movies
+    if (data.source?.hls) {
+      hlsUrl = data.source.hls;
+      audioNames = data.source.audio?.names || [];
+    }
 
-      // Try to get translation name from audios
-      let translation = 'Дублированный';
-      const audiosMatch = html.match(/audios:\s*\[([^\]]*)\]/);
-      if (audiosMatch) {
-        // Find the audio with matching ID to get its name
-        const audioRegex = new RegExp(`\\{[^}]*id:\\s*${audioId}[^}]*name:\\s*["']([^"']+)["'][^}]*\\}`);
-        const nameMatch = audiosMatch[1].match(audioRegex);
-        if (nameMatch) {
-          translation = nameMatch[1];
-        } else {
-          // Try alternative order
-          const altRegex = new RegExp(`\\{[^}]*name:\\s*["']([^"']+)["'][^}]*id:\\s*${audioId}[^}]*\\}`);
-          const altMatch = audiosMatch[1].match(altRegex);
-          if (altMatch) translation = altMatch[1];
-        }
+    // For series
+    if (data.playlist?.seasons && season !== undefined && episode !== undefined) {
+      const seasonData = data.playlist.seasons.find(s => s.season === season);
+      const episodeData = seasonData?.episodes.find(e => parseInt(e.episode) === episode);
+      if (episodeData?.hls) {
+        hlsUrl = episodeData.hls;
+        audioNames = episodeData.audio?.names || [];
       }
+    }
 
-      console.log('Found HLS stream for translation:', translation);
+    if (hlsUrl) {
+      const translationName = audioNames[audioIndex] || 'Дублированный';
+
       return {
-        url: getProxiedUrl(hlsUrl),
+        url: getProxiedUrl(cleanStreamUrl(hlsUrl)),
         quality: 'auto',
-        translation,
+        translation: translationName,
         source: 'Collaps',
       };
     }
 
-    // Fallback to direct m3u8 search
-    const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
-    if (m3u8Match) {
-      console.log('Found m3u8 URL via fallback');
-      return {
-        url: getProxiedUrl(cleanStreamUrl(m3u8Match[0])),
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Collaps',
-      };
-    }
-
-    console.error('No HLS stream found');
     return null;
   } catch (error) {
     console.error('Failed to parse translation stream:', error);
-    return null;
-  }
-}
-
-// Legacy: Parse translation from iframe URL directly
-async function parseTranslationUrl(translationUrl: string): Promise<VideoStream | null> {
-  try {
-    const response = await fetchWithTimeout(translationUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-      },
-    });
-
-    if (!response.ok) return null;
-
-    const html = await response.text();
-
-    const hlsMatch = html.match(/hls:\s*["']([^"']+)["']/);
-    if (hlsMatch) {
-      return {
-        url: getProxiedUrl(cleanStreamUrl(hlsMatch[1])),
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Collaps',
-      };
-    }
-
-    const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
-    if (m3u8Match) {
-      return {
-        url: getProxiedUrl(cleanStreamUrl(m3u8Match[0])),
-        quality: 'auto',
-        translation: 'Дублированный',
-        source: 'Collaps',
-      };
-    }
-
-    return null;
-  } catch {
     return null;
   }
 }

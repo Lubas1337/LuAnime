@@ -394,6 +394,8 @@ export default function SeriesPage({ params }: SeriesPageProps) {
                           players={players}
                           translations={translations}
                           kinopoiskId={seriesId}
+                          season={currentEpisode.seasonNumber}
+                          episode={currentEpisode.episodeNumber}
                           poster={posterUrl}
                           movieTitle={`${series.nameRu} S${currentEpisode.seasonNumber}E${currentEpisode.episodeNumber}`}
                           isLoading={streamLoading}
