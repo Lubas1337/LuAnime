@@ -10,6 +10,7 @@ import { SearchAutocomplete } from '@/components/search/search-autocomplete';
 const navLinks = [
   { href: '/', label: 'Главная' },
   { href: '/search', label: 'Каталог' },
+  { href: '/movies', label: 'Кино' },
 ];
 
 export function Header() {
