@@ -111,7 +111,15 @@ export default function SeriesPage({ params }: SeriesPageProps) {
               .then(data => {
                 if (data.translations?.length > 0) {
                   setTranslations(data.translations);
-                  setCurrentTranslation(data.translations[0]);
+                  const firstTranslation = data.translations[0];
+                  setCurrentTranslation(firstTranslation);
+                  // Set audio index from translation ID
+                  if (firstTranslation.id !== null) {
+                    const audioIdx = typeof firstTranslation.id === 'number'
+                      ? firstTranslation.id
+                      : parseInt(String(firstTranslation.id), 10);
+                    setSelectedAudioIndex(audioIdx);
+                  }
                 }
               })
               .catch(err => console.error('Failed to load translations:', err));
@@ -159,9 +167,12 @@ export default function SeriesPage({ params }: SeriesPageProps) {
         }
         if (data.translations?.length > 0) {
           setTranslations(data.translations);
-          // Update current translation to match selected audio index
-          if (data.translations[audio]) {
-            setCurrentTranslation(data.translations[audio]);
+          // Find and set translation matching the selected audio ID
+          const matchingTranslation = data.translations.find(
+            (t: Translation) => String(t.id) === String(audio)
+          );
+          if (matchingTranslation) {
+            setCurrentTranslation(matchingTranslation);
           }
         }
       })
@@ -177,11 +188,16 @@ export default function SeriesPage({ params }: SeriesPageProps) {
       });
   };
 
-  const handleTranslationSelect = (translation: Translation, index: number) => {
-    setSelectedAudioIndex(index);
+  const handleTranslationSelect = (translation: Translation) => {
+    // Use actual audio track ID from API, not array position
+    const audioIndex = translation.id !== null
+      ? (typeof translation.id === 'number' ? translation.id : parseInt(String(translation.id), 10))
+      : 0;
+
+    setSelectedAudioIndex(audioIndex);
     setCurrentTranslation(translation);
     if (currentEpisode) {
-      handleEpisodeSelect(currentEpisode, index);
+      handleEpisodeSelect(currentEpisode, audioIndex);
     }
   };
 

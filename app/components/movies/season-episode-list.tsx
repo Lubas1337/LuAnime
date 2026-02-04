@@ -26,7 +26,7 @@ interface SeasonEpisodeListProps {
   currentTranslation: Translation | null;
   onSeasonSelect: (seasonNumber: number) => void;
   onEpisodeSelect: (episode: Episode) => void;
-  onTranslationSelect: (translation: Translation, index: number) => void;
+  onTranslationSelect: (translation: Translation) => void;
 }
 
 export function SeasonEpisodeList({
@@ -69,10 +69,10 @@ export function SeasonEpisodeList({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
-                {translations.map((translation, index) => (
+                {translations.map((translation) => (
                   <DropdownMenuItem
-                    key={index}
-                    onClick={() => onTranslationSelect(translation, index)}
+                    key={translation.id ?? translation.name}
+                    onClick={() => onTranslationSelect(translation)}
                     className={currentTranslation?.name === translation.name ? 'bg-primary/20' : ''}
                   >
                     <div className="flex flex-col">
