@@ -223,10 +223,19 @@ export function MoviePlayer({
       }
     };
 
+    const handleTouchStart = () => {
+      setShowControls(true);
+      clearTimeout(hideTimeout);
+      if (isPlaying) {
+        hideTimeout = setTimeout(() => setShowControls(false), 3000);
+      }
+    };
+
     const container = containerRef.current;
     if (container) {
       container.addEventListener('mousemove', handleMouseMove);
       container.addEventListener('mouseenter', handleMouseMove);
+      container.addEventListener('touchstart', handleTouchStart);
       container.addEventListener('mouseleave', () => {
         if (isPlaying) setShowControls(false);
       });
@@ -235,6 +244,7 @@ export function MoviePlayer({
     return () => {
       if (container) {
         container.removeEventListener('mousemove', handleMouseMove);
+        container.removeEventListener('touchstart', handleTouchStart);
       }
       clearTimeout(hideTimeout);
     };
@@ -379,6 +389,52 @@ export function MoviePlayer({
     return `Качество ${index + 1}`;
   };
 
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      // Don't handle if focus is on an input
+      if (document.activeElement?.tagName === 'INPUT') return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          skip(-10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skip(10);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setVolume(Math.min(1, volume + 0.1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(Math.max(0, volume - 0.1));
+          break;
+        case ' ':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'm':
+        case 'M':
+          e.preventDefault();
+          toggleMute();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [volume, setVolume, duration]);
+
   // Loading state
   if (externalLoading) {
     return (
@@ -516,18 +572,18 @@ export function MoviePlayer({
       </div>
 
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2 sm:p-4 transition-opacity duration-300 ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div className="relative mb-3">
+        <div className="relative mb-2 sm:mb-3">
           <input
             type="range"
             min={0}
             max={duration || 100}
             value={currentTime}
             onChange={handleSeek}
-            className="w-full h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+            className="w-full h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
           />
           <div
             className="absolute top-0 left-0 h-1 bg-white/50 rounded-full pointer-events-none"
@@ -539,18 +595,19 @@ export function MoviePlayer({
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-1">
+          {/* Left controls - main playback */}
+          <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={togglePlay}
-              className="h-9 w-9 text-white hover:bg-white/20"
+              className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
             >
               {isPlaying ? (
-                <Pause className="h-5 w-5" />
+                <Pause className="h-4 w-4 sm:h-5 sm:w-5" />
               ) : (
-                <Play className="h-5 w-5 fill-current" />
+                <Play className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />
               )}
             </Button>
 
@@ -558,21 +615,22 @@ export function MoviePlayer({
               variant="ghost"
               size="icon"
               onClick={() => skip(-10)}
-              className="h-9 w-9 text-white hover:bg-white/20"
+              className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
             >
-              <SkipBack className="h-5 w-5" />
+              <SkipBack className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
             <Button
               variant="ghost"
               size="icon"
               onClick={() => skip(10)}
-              className="h-9 w-9 text-white hover:bg-white/20"
+              className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
             >
-              <SkipForward className="h-5 w-5" />
+              <SkipForward className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
-            <div className="flex items-center gap-2 group/volume">
+            {/* Volume - hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-2 group/volume">
               <Button
                 variant="ghost"
                 size="icon"
@@ -596,15 +654,16 @@ export function MoviePlayer({
               />
             </div>
 
-            <span className="text-sm text-white/80 ml-2">
+            <span className="text-xs sm:text-sm text-white/80 ml-1 sm:ml-2 whitespace-nowrap">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Source info */}
+          {/* Right controls */}
+          <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
+            {/* Source info - hidden on mobile */}
             {currentStream && (
-              <span className="text-xs text-white/60 mr-2">
+              <span className="hidden lg:inline text-xs text-white/60 mr-2">
                 {currentStream.source} • {currentStream.translation}
                 {qualityLevels.length > 0 && currentQuality >= 0 && (
                   <> • {getQualityLabel(qualityLevels[currentQuality], currentQuality)}</>
@@ -613,17 +672,17 @@ export function MoviePlayer({
               </span>
             )}
 
-            {/* Switch to iframe player (better quality) */}
+            {/* Switch to iframe player - hidden on small screens */}
             {players.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setUseIframe(true)}
-                className="h-9 text-white hover:bg-white/20 text-xs"
+                className="hidden md:flex h-8 sm:h-9 text-white hover:bg-white/20 text-xs px-2"
                 title="Внешний плеер с лучшим качеством (4K)"
               >
-                <Monitor className="h-4 w-4 mr-1" />
-                4K Плеер
+                <Monitor className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">4K</span>
               </Button>
             )}
 
@@ -632,9 +691,9 @@ export function MoviePlayer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 text-white hover:bg-white/20"
+                  className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
                 >
-                  <Settings className="h-5 w-5" />
+                  <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
@@ -662,10 +721,24 @@ export function MoviePlayer({
                         onClick={() => setUseIframe(true)}
                         className="text-primary"
                       >
-                        🎬 4K в плеере →
+                        4K в плеере
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
+                  </>
+                )}
+
+                {/* 4K Player option for mobile (since button is hidden) */}
+                {players.length > 0 && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setUseIframe(true)}
+                      className="md:hidden"
+                    >
+                      <Monitor className="h-4 w-4 mr-2" />
+                      4K Плеер
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="md:hidden" />
                   </>
                 )}
 
@@ -723,12 +796,12 @@ export function MoviePlayer({
               variant="ghost"
               size="icon"
               onClick={toggleFullscreen}
-              className="h-9 w-9 text-white hover:bg-white/20"
+              className="h-8 w-8 sm:h-9 sm:w-9 text-white hover:bg-white/20"
             >
               {isFullscreen ? (
-                <Minimize className="h-5 w-5" />
+                <Minimize className="h-4 w-4 sm:h-5 sm:w-5" />
               ) : (
-                <Maximize className="h-5 w-5" />
+                <Maximize className="h-4 w-4 sm:h-5 sm:w-5" />
               )}
             </Button>
           </div>

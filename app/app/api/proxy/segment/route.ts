@@ -6,7 +6,13 @@ export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {
-    return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    return NextResponse.json({ error: 'URL is required' }, {
+      status: 400,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      },
+    });
   }
 
   try {
@@ -19,7 +25,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return new NextResponse(null, { status: response.status });
+      return new NextResponse(null, {
+        status: response.status,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        },
+      });
     }
 
     const data = await response.arrayBuffer();
@@ -36,7 +48,13 @@ export async function GET(request: NextRequest) {
     console.error('Segment proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to proxy segment' },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        },
+      }
     );
   }
 }

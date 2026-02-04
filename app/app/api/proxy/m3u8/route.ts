@@ -6,22 +6,34 @@ export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {
-    return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    return NextResponse.json({ error: 'URL is required' }, {
+      status: 400,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      },
+    });
   }
 
   try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://flcksbr.xyz/',
-        'Origin': 'https://flcksbr.xyz',
+        'Referer': 'https://api.delivembd.ws/',
+        'Origin': 'https://api.delivembd.ws',
       },
     });
 
     if (!response.ok) {
       return NextResponse.json(
         { error: 'Failed to fetch m3u8' },
-        { status: response.status }
+        {
+          status: response.status,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          },
+        }
       );
     }
 
@@ -43,7 +55,13 @@ export async function GET(request: NextRequest) {
     console.error('M3U8 proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to proxy m3u8' },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        },
+      }
     );
   }
 }
