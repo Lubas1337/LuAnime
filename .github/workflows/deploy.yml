@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: lubas1337/luanime
+  IMAGE_NAME: lubas1337/luwatch
 
 jobs:
   build-and-deploy:
@@ -54,8 +54,8 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
             # Update image tag in deployment
-            kubectl set image deployment/luanime \
+            kubectl set image deployment/luwatch \
               app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
             # Wait for rollout
-            kubectl rollout status deployment/luanime --timeout=120s
+            kubectl rollout status deployment/luwatch --timeout=120s
