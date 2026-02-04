@@ -42,11 +42,11 @@ export async function GET(request: NextRequest) {
     // Try to get direct streams first (with season/episode for series)
     const streams = await getMovieStream(id, season, episode);
 
-    // Also get iframe players as fallback
-    const players = await getMoviePlayers(id);
+    // Also get iframe players as fallback (with season/episode for series)
+    const players = await getMoviePlayers(id, season, episode);
 
-    // Get available translations for selection
-    const translations = await getAvailableTranslations(id);
+    // Get available translations for selection (with season/episode for series)
+    const translations = await getAvailableTranslations(id, season, episode);
 
     return NextResponse.json({
       streams,

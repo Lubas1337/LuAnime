@@ -136,10 +136,19 @@ async function parseCollapsDirectly(
 }
 
 // Get list of available players from Kinobox
-export async function getKinoboxPlayers(kinopoiskId: number): Promise<KinoboxPlayer[]> {
+export async function getKinoboxPlayers(
+  kinopoiskId: number,
+  season?: number,
+  episode?: number
+): Promise<KinoboxPlayer[]> {
   try {
+    let url = `${KINOBOX_API}?kinopoisk=${kinopoiskId}`;
+    if (season !== undefined && episode !== undefined) {
+      url += `&season=${season}&episode=${episode}`;
+    }
+
     const response = await fetchWithTimeout(
-      `${KINOBOX_API}?kinopoisk=${kinopoiskId}`,
+      url,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -335,7 +344,7 @@ export async function getMovieStream(
   }
 
   // Method 2: Try Kinobox API for other players
-  const players = await getKinoboxPlayers(kinopoiskId);
+  const players = await getKinoboxPlayers(kinopoiskId, season, episode);
 
   if (players.length === 0) {
     return streams;
@@ -378,13 +387,17 @@ export async function getMovieStream(
 }
 
 // Get all available players with their iframe URLs (for fallback)
-export async function getMoviePlayers(kinopoiskId: number): Promise<Array<{
+export async function getMoviePlayers(
+  kinopoiskId: number,
+  season?: number,
+  episode?: number
+): Promise<Array<{
   type: string;
   iframeUrl: string;
   translation: string;
   quality: string;
 }>> {
-  const players = await getKinoboxPlayers(kinopoiskId);
+  const players = await getKinoboxPlayers(kinopoiskId, season, episode);
 
   return players
     .filter(p => p.iframeUrl)
@@ -397,9 +410,13 @@ export async function getMoviePlayers(kinopoiskId: number): Promise<Array<{
 }
 
 // Get all available translations for a movie
-export async function getAvailableTranslations(kinopoiskId: number): Promise<Translation[]> {
+export async function getAvailableTranslations(
+  kinopoiskId: number,
+  season?: number,
+  episode?: number
+): Promise<Translation[]> {
   const translations: Translation[] = [];
-  const players = await getKinoboxPlayers(kinopoiskId);
+  const players = await getKinoboxPlayers(kinopoiskId, season, episode);
 
   for (const player of players) {
     if (player.type === 'Collaps' && player.translations) {
