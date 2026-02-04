@@ -31,10 +31,10 @@ export async function GET(request: NextRequest) {
     const season = seasonParam ? parseInt(seasonParam, 10) : undefined;
     const episode = episodeParam ? parseInt(episodeParam, 10) : undefined;
 
-    // If specific translation URL provided, parse just that
+    // If specific translation/audio ID provided, parse just that
     if (translationUrl) {
-      console.log('Loading specific translation:', translationUrl);
-      const stream = await parseTranslationStream(translationUrl);
+      console.log('Loading specific translation:', translationUrl, 'for kp:', id);
+      const stream = await parseTranslationStream(translationUrl, id, season, episode);
       console.log('Translation stream result:', stream ? 'found' : 'not found');
       return NextResponse.json({
         stream,

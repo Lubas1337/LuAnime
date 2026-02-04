@@ -416,19 +416,72 @@ export async function getAvailableTranslations(
   episode?: number
 ): Promise<Translation[]> {
   const translations: Translation[] = [];
-  const players = await getKinoboxPlayers(kinopoiskId, season, episode);
 
-  for (const player of players) {
-    if (player.type === 'Collaps' && player.translations) {
-      // Collaps has multiple translations
-      for (const t of player.translations) {
-        if (t.name && t.iframeUrl) {
+  // First try to get translations from Collaps API directly
+  try {
+    let url = `${COLLAPS_API}${kinopoiskId}`;
+    if (season && episode) {
+      url += `?season=${season}&episode=${episode}`;
+    }
+
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://flcksbr.xyz/',
+      },
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Extract audios array from makePlayer config
+      const audiosMatch = html.match(/audios:\s*\[([^\]]+)\]/);
+      if (audiosMatch) {
+        // Parse each audio object
+        const audioRegex = /\{\s*name:\s*["']([^"']+)["'][^}]*id:\s*(\d+)[^}]*\}/g;
+        let match;
+        while ((match = audioRegex.exec(audiosMatch[1])) !== null) {
           translations.push({
-            id: t.iframeUrl, // Use iframeUrl as ID for Collaps
-            name: t.name,
-            quality: t.quality || 'HD',
+            id: match[2], // Use audio ID
+            name: match[1],
+            quality: 'HD',
             source: 'Collaps',
           });
+        }
+
+        // Also try alternative format: {id: X, name: "Y"}
+        if (translations.length === 0) {
+          const altRegex = /\{\s*id:\s*(\d+)[^}]*name:\s*["']([^"']+)["'][^}]*\}/g;
+          while ((match = altRegex.exec(audiosMatch[1])) !== null) {
+            translations.push({
+              id: match[1],
+              name: match[2],
+              quality: 'HD',
+              source: 'Collaps',
+            });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to get Collaps translations:', error);
+  }
+
+  // Fallback to Kinobox API
+  if (translations.length === 0) {
+    const players = await getKinoboxPlayers(kinopoiskId, season, episode);
+
+    for (const player of players) {
+      if (player.type === 'Collaps' && player.translations) {
+        for (const t of player.translations) {
+          if (t.name && t.id) {
+            translations.push({
+              id: String(t.id),
+              name: t.name,
+              quality: t.quality || 'HD',
+              source: 'Collaps',
+            });
+          }
         }
       }
     }
@@ -443,12 +496,35 @@ export async function getAvailableTranslations(
   });
 }
 
-// Parse a specific Collaps translation URL
-export async function parseTranslationStream(translationUrl: string): Promise<VideoStream | null> {
-  console.log('Parsing translation stream from:', translationUrl);
+// Parse a specific translation by audio ID using Collaps API
+export async function parseTranslationStream(
+  audioId: string,
+  kinopoiskId?: number,
+  season?: number,
+  episode?: number
+): Promise<VideoStream | null> {
+  console.log('Parsing translation stream for audio:', audioId, 'kp:', kinopoiskId);
+
+  // If audioId looks like a URL (legacy), try to parse it directly
+  if (audioId.startsWith('http')) {
+    return parseTranslationUrl(audioId);
+  }
+
+  // Use Collaps API with audio parameter
+  if (!kinopoiskId) {
+    console.error('kinopoiskId required for audio-based translation');
+    return null;
+  }
 
   try {
-    const response = await fetchWithTimeout(translationUrl, {
+    let url = `${COLLAPS_API}${kinopoiskId}?audio=${audioId}`;
+    if (season && episode) {
+      url += `&season=${season}&episode=${episode}`;
+    }
+
+    console.log('Fetching Collaps with audio:', url);
+
+    const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://flcksbr.xyz/',
@@ -456,7 +532,7 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
     });
 
     if (!response.ok) {
-      console.error('Translation stream fetch failed:', response.status);
+      console.error('Collaps fetch failed:', response.status);
       return null;
     }
 
@@ -471,10 +547,20 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
       let translation = 'Дублированный';
       const audiosMatch = html.match(/audios:\s*\[([^\]]*)\]/);
       if (audiosMatch) {
-        const nameMatch = audiosMatch[1].match(/name:\s*["']([^"']+)["']/);
-        if (nameMatch) translation = nameMatch[1];
+        // Find the audio with matching ID to get its name
+        const audioRegex = new RegExp(`\\{[^}]*id:\\s*${audioId}[^}]*name:\\s*["']([^"']+)["'][^}]*\\}`);
+        const nameMatch = audiosMatch[1].match(audioRegex);
+        if (nameMatch) {
+          translation = nameMatch[1];
+        } else {
+          // Try alternative order
+          const altRegex = new RegExp(`\\{[^}]*name:\\s*["']([^"']+)["'][^}]*id:\\s*${audioId}[^}]*\\}`);
+          const altMatch = audiosMatch[1].match(altRegex);
+          if (altMatch) translation = altMatch[1];
+        }
       }
 
+      console.log('Found HLS stream for translation:', translation);
       return {
         url: getProxiedUrl(hlsUrl),
         quality: 'auto',
@@ -495,10 +581,50 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
       };
     }
 
-    console.error('No HLS stream found in translation page');
+    console.error('No HLS stream found');
     return null;
   } catch (error) {
     console.error('Failed to parse translation stream:', error);
+    return null;
+  }
+}
+
+// Legacy: Parse translation from iframe URL directly
+async function parseTranslationUrl(translationUrl: string): Promise<VideoStream | null> {
+  try {
+    const response = await fetchWithTimeout(translationUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://flcksbr.xyz/',
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+
+    const hlsMatch = html.match(/hls:\s*["']([^"']+)["']/);
+    if (hlsMatch) {
+      return {
+        url: getProxiedUrl(cleanStreamUrl(hlsMatch[1])),
+        quality: 'auto',
+        translation: 'Дублированный',
+        source: 'Collaps',
+      };
+    }
+
+    const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
+    if (m3u8Match) {
+      return {
+        url: getProxiedUrl(cleanStreamUrl(m3u8Match[0])),
+        quality: 'auto',
+        translation: 'Дублированный',
+        source: 'Collaps',
+      };
+    }
+
+    return null;
+  } catch {
     return null;
   }
 }
