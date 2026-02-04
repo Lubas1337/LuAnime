@@ -33,7 +33,9 @@ export async function GET(request: NextRequest) {
 
     // If specific translation URL provided, parse just that
     if (translationUrl) {
+      console.log('Loading specific translation:', translationUrl);
       const stream = await parseTranslationStream(translationUrl);
+      console.log('Translation stream result:', stream ? 'found' : 'not found');
       return NextResponse.json({
         stream,
       });

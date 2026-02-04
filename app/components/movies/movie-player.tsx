@@ -92,6 +92,7 @@ export function MoviePlayer({
   const [qualityLevels, setQualityLevels] = useState<HlsLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [loadingTranslation, setLoadingTranslation] = useState(false);
+  const [currentTranslationName, setCurrentTranslationName] = useState<string | null>(null);
 
   const { volume, playbackRate, setVolume, setPlaybackRate } = usePlayerStore();
 
@@ -165,6 +166,10 @@ export function MoviePlayer({
     if (currentStream && !useIframe) {
       setIsLoading(true);
       initVideo(currentStream.url);
+      // Set initial translation name from stream
+      if (!currentTranslationName && currentStream.translation) {
+        setCurrentTranslationName(currentStream.translation);
+      }
     }
 
     return () => {
@@ -173,7 +178,7 @@ export function MoviePlayer({
         hlsRef.current = null;
       }
     };
-  }, [currentStream, initVideo, useIframe]);
+  }, [currentStream, initVideo, useIframe, currentTranslationName]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -351,28 +356,51 @@ export function MoviePlayer({
 
   // Load a specific translation
   const loadTranslation = async (translation: Translation) => {
-    if (!kinopoiskId || !translation.id) return;
+    if (!kinopoiskId || !translation.id) {
+      console.error('Missing kinopoiskId or translation.id');
+      return;
+    }
 
     setLoadingTranslation(true);
     try {
+      // Save current playback position and playing state
+      const currentPos = videoRef.current?.currentTime || 0;
+      const wasPlaying = isPlayingRef.current;
+
       const response = await fetch(
         `/api/kinobox/stream?kp=${kinopoiskId}&translation=${encodeURIComponent(String(translation.id))}`
       );
+
+      if (!response.ok) {
+        console.error('Failed to fetch translation stream:', response.status);
+        return;
+      }
+
       const data = await response.json();
 
       if (data.stream?.url) {
-        // Save current playback position
-        const currentPos = videoRef.current?.currentTime || 0;
-
         // Load new stream
         initVideo(data.stream.url);
+        setCurrentTranslationName(translation.name);
 
-        // Restore position after a short delay
-        setTimeout(() => {
-          if (videoRef.current && currentPos > 0) {
-            videoRef.current.currentTime = currentPos;
+        // Restore position and play state after video loads
+        const handleCanPlay = () => {
+          if (videoRef.current) {
+            if (currentPos > 0) {
+              videoRef.current.currentTime = currentPos;
+            }
+            if (wasPlaying) {
+              videoRef.current.play();
+            }
+            videoRef.current.removeEventListener('canplay', handleCanPlay);
           }
-        }, 500);
+        };
+
+        if (videoRef.current) {
+          videoRef.current.addEventListener('canplay', handleCanPlay);
+        }
+      } else {
+        console.error('No stream URL in response:', data);
       }
     } catch (error) {
       console.error('Failed to load translation:', error);
@@ -751,6 +779,7 @@ export function MoviePlayer({
                         key={index}
                         onClick={() => loadTranslation(translation)}
                         disabled={loadingTranslation}
+                        className={currentTranslationName === translation.name ? 'bg-primary/20' : ''}
                       >
                         {translation.name}
                         <span className="ml-auto text-xs text-muted-foreground">

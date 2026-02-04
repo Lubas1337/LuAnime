@@ -445,6 +445,8 @@ export async function getAvailableTranslations(
 
 // Parse a specific Collaps translation URL
 export async function parseTranslationStream(translationUrl: string): Promise<VideoStream | null> {
+  console.log('Parsing translation stream from:', translationUrl);
+
   try {
     const response = await fetchWithTimeout(translationUrl, {
       headers: {
@@ -453,7 +455,10 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error('Translation stream fetch failed:', response.status);
+      return null;
+    }
 
     const html = await response.text();
 
@@ -481,6 +486,7 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
     // Fallback to direct m3u8 search
     const m3u8Match = html.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/);
     if (m3u8Match) {
+      console.log('Found m3u8 URL via fallback');
       return {
         url: getProxiedUrl(cleanStreamUrl(m3u8Match[0])),
         quality: 'auto',
@@ -489,6 +495,7 @@ export async function parseTranslationStream(translationUrl: string): Promise<Vi
       };
     }
 
+    console.error('No HLS stream found in translation page');
     return null;
   } catch (error) {
     console.error('Failed to parse translation stream:', error);
