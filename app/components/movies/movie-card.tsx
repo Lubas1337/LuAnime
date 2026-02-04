@@ -26,11 +26,18 @@ function getMovieYear(movie: MoviePreview): string | null {
   return String(movie.year);
 }
 
+function getMovieLink(movie: MoviePreview): string {
+  const id = movie.kinopoiskId || movie.filmId;
+  const isSeries = movie.type === 'TV_SERIES' || movie.type === 'MINI_SERIES' || movie.type === 'TV_SHOW';
+  return isSeries ? `/series/${id}` : `/movies/${id}`;
+}
+
 export function MovieCard({ movie, variant = 'default' }: MovieCardProps) {
   const id = movie.kinopoiskId || movie.filmId;
   const imageUrl = getMoviePosterUrl(movie.posterUrlPreview || movie.posterUrl);
   const rating = getMovieRating(movie);
   const year = getMovieYear(movie);
+  const href = getMovieLink(movie);
 
   if (variant === 'wide') {
     return <WideMovieCard movie={movie} />;
@@ -42,7 +49,7 @@ export function MovieCard({ movie, variant = 'default' }: MovieCardProps) {
 
   return (
     <Link
-      href={`/movies/${id}`}
+      href={href}
       className="anime-card group block overflow-hidden rounded-xl bg-card border border-transparent hover:border-primary/20"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-t-xl">
@@ -100,14 +107,14 @@ export function MovieCard({ movie, variant = 'default' }: MovieCardProps) {
 }
 
 function CompactMovieCard({ movie }: { movie: MoviePreview }) {
-  const id = movie.kinopoiskId || movie.filmId;
   const imageUrl = getMoviePosterUrl(movie.posterUrlPreview || movie.posterUrl);
   const rating = getMovieRating(movie);
   const year = getMovieYear(movie);
+  const href = getMovieLink(movie);
 
   return (
     <Link
-      href={`/movies/${id}`}
+      href={href}
       className="anime-card group flex gap-3 rounded-lg bg-card p-2 transition-colors hover:bg-secondary"
     >
       <div className="relative h-20 w-14 flex-shrink-0 overflow-hidden rounded">
@@ -140,14 +147,14 @@ function CompactMovieCard({ movie }: { movie: MoviePreview }) {
 }
 
 function WideMovieCard({ movie }: { movie: MoviePreview }) {
-  const id = movie.kinopoiskId || movie.filmId;
   const imageUrl = getMoviePosterUrl(movie.posterUrlPreview || movie.posterUrl);
   const rating = getMovieRating(movie);
   const year = getMovieYear(movie);
+  const href = getMovieLink(movie);
 
   return (
     <Link
-      href={`/movies/${id}`}
+      href={href}
       className="anime-card group flex gap-4 rounded-lg bg-card overflow-hidden"
     >
       <div className="relative h-32 w-24 flex-shrink-0 overflow-hidden">

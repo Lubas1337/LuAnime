@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const kinopoiskId = searchParams.get('kp');
     const translationUrl = searchParams.get('translation');
+    const seasonParam = searchParams.get('season');
+    const episodeParam = searchParams.get('episode');
 
     if (!kinopoiskId) {
       return NextResponse.json(
@@ -25,6 +27,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Parse season and episode if provided
+    const season = seasonParam ? parseInt(seasonParam, 10) : undefined;
+    const episode = episodeParam ? parseInt(episodeParam, 10) : undefined;
+
     // If specific translation URL provided, parse just that
     if (translationUrl) {
       const stream = await parseTranslationStream(translationUrl);
@@ -33,8 +39,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Try to get direct streams first
-    const streams = await getMovieStream(id);
+    // Try to get direct streams first (with season/episode for series)
+    const streams = await getMovieStream(id, season, episode);
 
     // Also get iframe players as fallback
     const players = await getMoviePlayers(id);

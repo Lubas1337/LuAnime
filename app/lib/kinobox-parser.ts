@@ -64,12 +64,22 @@ function cleanStreamUrl(url: string): string {
 }
 
 // Parse Collaps embed directly (most reliable method)
-async function parseCollapsDirectly(kinopoiskId: number): Promise<VideoStream[]> {
+async function parseCollapsDirectly(
+  kinopoiskId: number,
+  season?: number,
+  episode?: number
+): Promise<VideoStream[]> {
   const streams: VideoStream[] = [];
 
   try {
+    // Build URL with optional season/episode parameters
+    let url = `${COLLAPS_API}${kinopoiskId}`;
+    if (season && episode) {
+      url += `?season=${season}&episode=${episode}`;
+    }
+
     const response = await fetchWithTimeout(
-      `${COLLAPS_API}${kinopoiskId}`,
+      url,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -301,13 +311,17 @@ async function fetchAllohaStreamUrl(videoId: number, token: string, movieId: str
   return null;
 }
 
-// Get direct video stream for a movie
-export async function getMovieStream(kinopoiskId: number): Promise<VideoStream[]> {
+// Get direct video stream for a movie or series episode
+export async function getMovieStream(
+  kinopoiskId: number,
+  season?: number,
+  episode?: number
+): Promise<VideoStream[]> {
   const streams: VideoStream[] = [];
 
   // Method 1: Try Collaps direct API first (most reliable, no ads)
   try {
-    const collapsStreams = await parseCollapsDirectly(kinopoiskId);
+    const collapsStreams = await parseCollapsDirectly(kinopoiskId, season, episode);
     if (collapsStreams.length > 0) {
       streams.push(...collapsStreams);
     }
