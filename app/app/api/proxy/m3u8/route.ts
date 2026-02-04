@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Range',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Range',
+};
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {
-    return NextResponse.json({ error: 'URL is required' }, {
-      status: 400,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      },
-    });
+    return NextResponse.json(
+      { error: 'URL is required' },
+      { status: 400, headers: corsHeaders }
+    );
   }
 
   try {
@@ -26,14 +31,8 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: 'Failed to fetch m3u8' },
-        {
-          status: response.status,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          },
-        }
+        { error: 'Failed to fetch m3u8', status: response.status },
+        { status: response.status, headers: corsHeaders }
       );
     }
 
@@ -45,9 +44,8 @@ export async function GET(request: NextRequest) {
 
     return new NextResponse(rewrittenContent, {
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/vnd.apple.mpegurl',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Cache-Control': 'no-cache',
       },
     });
@@ -55,13 +53,7 @@ export async function GET(request: NextRequest) {
     console.error('M3U8 proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to proxy m3u8' },
-      {
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        },
-      }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -94,28 +86,22 @@ function rewriteM3U8(content: string, baseUrl: string): string {
     }
 
     // For segment/playlist URLs on their own lines
-    const url = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
+    const segmentUrl = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
 
     // Proxy .m3u8 files through our m3u8 proxy
-    if (url.includes('.m3u8')) {
-      return `/api/proxy/m3u8?url=${encodeURIComponent(url)}`;
+    if (segmentUrl.includes('.m3u8')) {
+      return `/api/proxy/m3u8?url=${encodeURIComponent(segmentUrl)}`;
     }
 
     // Proxy video/audio segments through segment proxy
-    if (url.includes('.ts') || url.includes('.mp4') || url.includes('.m4s') || url.includes('.aac')) {
-      return `/api/proxy/segment?url=${encodeURIComponent(url)}`;
+    if (segmentUrl.includes('.ts') || segmentUrl.includes('.mp4') || segmentUrl.includes('.m4s') || segmentUrl.includes('.aac')) {
+      return `/api/proxy/segment?url=${encodeURIComponent(segmentUrl)}`;
     }
 
-    return url;
+    return segmentUrl;
   }).join('\n');
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return new NextResponse(null, { headers: corsHeaders });
 }
