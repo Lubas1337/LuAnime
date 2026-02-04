@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: luanime
+  name: luwatch
   namespace: default
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -9,9 +9,20 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
+        - watch.lubax.net
         - anime.lubax.net
-      secretName: luanime-tls
+      secretName: luwatch-tls
   rules:
+    - host: watch.lubax.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: luwatch
+                port:
+                  number: 80
     - host: anime.lubax.net
       http:
         paths:
@@ -19,6 +30,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: luanime
+                name: luwatch
                 port:
                   number: 80

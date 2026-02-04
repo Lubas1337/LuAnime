@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: luanime
+  name: luwatch
   namespace: default
   labels:
-    app: luanime
+    app: luwatch
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: luanime
+      app: luwatch
   template:
     metadata:
       labels:
-        app: luanime
+        app: luwatch
     spec:
       containers:
         - name: app
-          image: ghcr.io/lubas1337/luanime:latest
+          image: ghcr.io/lubas1337/luwatch:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
