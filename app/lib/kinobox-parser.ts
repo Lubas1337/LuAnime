@@ -417,7 +417,7 @@ export async function getAvailableTranslations(
 ): Promise<Translation[]> {
   const translations: Translation[] = [];
 
-  // First try to get translations from Collaps API directly
+  // Get translations from Collaps API directly
   try {
     let url = `${COLLAPS_API}${kinopoiskId}`;
     if (season && episode) {
@@ -434,28 +434,44 @@ export async function getAvailableTranslations(
     if (response.ok) {
       const html = await response.text();
 
-      // Extract audios array from makePlayer config
-      const audiosMatch = html.match(/audios:\s*\[([^\]]+)\]/);
-      if (audiosMatch) {
-        // Parse each audio object
-        const audioRegex = /\{\s*name:\s*["']([^"']+)["'][^}]*id:\s*(\d+)[^}]*\}/g;
-        let match;
-        while ((match = audioRegex.exec(audiosMatch[1])) !== null) {
-          translations.push({
-            id: match[2], // Use audio ID
-            name: match[1],
-            quality: 'HD',
-            source: 'Collaps',
-          });
-        }
+      // New format: audio: {"names":["..."], "order":[...]}
+      const audioMatch = html.match(/audio:\s*(\{"names":\[.*?\],"order":\[.*?\]\})/);
+      if (audioMatch) {
+        try {
+          const audioData = JSON.parse(audioMatch[1]);
+          if (audioData.names && Array.isArray(audioData.names)) {
+            // Use order array if available, otherwise use natural order
+            const order = audioData.order || audioData.names.map((_: string, i: number) => i);
 
-        // Also try alternative format: {id: X, name: "Y"}
-        if (translations.length === 0) {
-          const altRegex = /\{\s*id:\s*(\d+)[^}]*name:\s*["']([^"']+)["'][^}]*\}/g;
-          while ((match = altRegex.exec(audiosMatch[1])) !== null) {
+            for (const idx of order) {
+              const name = audioData.names[idx];
+              // Skip invalid entries like "delete"
+              if (name && name !== 'delete' && !name.toLowerCase().includes('delete')) {
+                translations.push({
+                  id: String(idx), // Index is the audio ID
+                  name: name,
+                  quality: 'HD',
+                  source: 'Collaps',
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse audio JSON:', e);
+        }
+      }
+
+      // Fallback: try old format audios: [{...}]
+      if (translations.length === 0) {
+        const audiosMatch = html.match(/audios:\s*\[([^\]]+)\]/);
+        if (audiosMatch) {
+          const audioRegex = /\{\s*name:\s*["']([^"']+)["'][^}]*\}/g;
+          let match;
+          let idx = 0;
+          while ((match = audioRegex.exec(audiosMatch[1])) !== null) {
             translations.push({
-              id: match[1],
-              name: match[2],
+              id: String(idx++),
+              name: match[1],
               quality: 'HD',
               source: 'Collaps',
             });
@@ -465,26 +481,6 @@ export async function getAvailableTranslations(
     }
   } catch (error) {
     console.error('Failed to get Collaps translations:', error);
-  }
-
-  // Fallback to Kinobox API
-  if (translations.length === 0) {
-    const players = await getKinoboxPlayers(kinopoiskId, season, episode);
-
-    for (const player of players) {
-      if (player.type === 'Collaps' && player.translations) {
-        for (const t of player.translations) {
-          if (t.name && t.id) {
-            translations.push({
-              id: String(t.id),
-              name: t.name,
-              quality: t.quality || 'HD',
-              source: 'Collaps',
-            });
-          }
-        }
-      }
-    }
   }
 
   // Remove duplicates by name
