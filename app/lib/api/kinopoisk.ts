@@ -110,6 +110,31 @@ class KinopoiskClient {
       `/v2.2/films/collections?type=${collectionType}&page=${page}`
     );
   }
+
+  async getFilmsWithFilters(params: {
+    type: 'FILM' | 'TV_SERIES' | 'MINI_SERIES' | 'ALL';
+    genres?: number;
+    countries?: number;
+    yearFrom?: number;
+    yearTo?: number;
+    ratingFrom?: number;
+    order?: 'RATING' | 'NUM_VOTE' | 'YEAR';
+    page?: number;
+  }): Promise<FilmsResponse> {
+    const query = new URLSearchParams();
+    if (params.type !== 'ALL') {
+      query.set('type', params.type);
+    }
+    if (params.genres) query.set('genres', String(params.genres));
+    if (params.countries) query.set('countries', String(params.countries));
+    if (params.yearFrom) query.set('yearFrom', String(params.yearFrom));
+    if (params.yearTo) query.set('yearTo', String(params.yearTo));
+    if (params.ratingFrom) query.set('ratingFrom', String(params.ratingFrom));
+    if (params.order) query.set('order', params.order);
+    query.set('page', String(params.page || 1));
+
+    return this.request<FilmsResponse>(`/v2.2/films?${query.toString()}`);
+  }
 }
 
 export const kinopoiskClient = new KinopoiskClient();
