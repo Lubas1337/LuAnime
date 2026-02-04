@@ -3,11 +3,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Search, Loader2, Star } from 'lucide-react';
+import { Search, Loader2, Star, Sparkles, Film, Tv } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { searchAnime } from '@/lib/api/anime';
+import { kinopoiskClient } from '@/lib/api/kinopoisk';
 import { getImageUrl } from '@/types/anime';
+import { getMoviePosterUrl } from '@/types/movie';
 import type { Anime } from '@/types/anime';
+import type { MoviePreview } from '@/types/movie';
+
+type SearchCategory = 'anime' | 'movies' | 'series';
+
+interface SearchResult {
+  id: number;
+  title: string;
+  imageUrl: string;
+  year?: string | number;
+  rating?: number;
+  episodes?: string;
+  type: SearchCategory;
+  href: string;
+}
 
 interface SearchAutocompleteProps {
   className?: string;
@@ -17,12 +33,42 @@ interface SearchAutocompleteProps {
 export function SearchAutocomplete({ className, onSelect }: SearchAutocompleteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Anime[]>([]);
+  const [category, setCategory] = useState<SearchCategory>('anime');
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Convert anime to unified result
+  const animeToResult = (anime: Anime): SearchResult => ({
+    id: anime.id,
+    title: anime.title_ru,
+    imageUrl: anime.image || getImageUrl(anime.poster),
+    year: anime.year,
+    rating: anime.grade,
+    episodes: anime.episodes_total
+      ? `${anime.episodes_released || anime.episodes_total} эп.`
+      : undefined,
+    type: 'anime',
+    href: `/anime/${anime.id}`,
+  });
+
+  // Convert movie to unified result
+  const movieToResult = (movie: MoviePreview, type: SearchCategory): SearchResult => {
+    const id = movie.kinopoiskId || movie.filmId || 0;
+    const isSeries = type === 'series';
+    return {
+      id,
+      title: movie.nameRu || movie.nameOriginal || '',
+      imageUrl: getMoviePosterUrl(movie.posterUrlPreview || movie.posterUrl),
+      year: movie.year,
+      rating: movie.ratingKinopoisk || (typeof movie.rating === 'number' ? movie.rating : undefined),
+      type,
+      href: isSeries ? `/series/${id}` : `/movies/${id}`,
+    };
+  };
 
   // Search with debounce
   useEffect(() => {
@@ -35,8 +81,20 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
     const timeoutId = setTimeout(async () => {
       setIsLoading(true);
       try {
-        const data = await searchAnime(query, 0);
-        setResults(data.slice(0, 6)); // Limit to 6 results
+        if (category === 'anime') {
+          const data = await searchAnime(query, 0);
+          setResults(data.slice(0, 6).map(animeToResult));
+        } else {
+          const response = await kinopoiskClient.searchMovies(query, 1);
+          const filtered = response.films.filter((film) => {
+            if (category === 'movies') {
+              return film.type === 'FILM' || film.type === 'VIDEO' || !film.type;
+            } else {
+              return film.type === 'TV_SERIES' || film.type === 'MINI_SERIES' || film.type === 'TV_SHOW';
+            }
+          });
+          setResults(filtered.slice(0, 6).map((m) => movieToResult(m, category)));
+        }
         setIsOpen(true);
         setSelectedIndex(-1);
       } catch (error) {
@@ -47,7 +105,7 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, category]);
 
   // Close on outside click
   useEffect(() => {
@@ -61,11 +119,11 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (anime: Anime) => {
+  const handleSelect = (result: SearchResult) => {
     setQuery('');
     setIsOpen(false);
     onSelect?.();
-    router.push(`/anime/${anime.id}`);
+    router.push(result.href);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,7 +133,7 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
     } else if (query.trim()) {
       setIsOpen(false);
       onSelect?.();
-      router.push(`/search?q=${encodeURIComponent(query)}`);
+      router.push(`/search?q=${encodeURIComponent(query)}&category=${category}`);
     }
   };
 
@@ -98,6 +156,30 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
     }
   };
 
+  const handleCategoryChange = (newCategory: SearchCategory) => {
+    setCategory(newCategory);
+    setResults([]);
+    setSelectedIndex(-1);
+  };
+
+  const categoryIcons = {
+    anime: Sparkles,
+    movies: Film,
+    series: Tv,
+  };
+
+  const categoryLabels = {
+    anime: 'Аниме',
+    movies: 'Фильмы',
+    series: 'Сериалы',
+  };
+
+  const placeholders = {
+    anime: 'Поиск аниме...',
+    movies: 'Поиск фильмов...',
+    series: 'Поиск сериалов...',
+  };
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <form onSubmit={handleSubmit}>
@@ -106,7 +188,7 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
           <Input
             ref={inputRef}
             type="search"
-            placeholder="Поиск аниме..."
+            placeholder={placeholders[category]}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => query.trim() && results.length > 0 && setIsOpen(true)}
@@ -121,24 +203,47 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
       </form>
 
       {/* Dropdown */}
-      {isOpen && results.length > 0 && (
+      {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="max-h-[400px] overflow-y-auto">
-            {results.map((anime, index) => {
-              const imageUrl = anime.image || getImageUrl(anime.poster);
+          {/* Category Tabs */}
+          <div className="flex border-b border-border">
+            {(Object.keys(categoryLabels) as SearchCategory[]).map((cat) => {
+              const Icon = categoryIcons[cat];
+              const isActive = category === cat;
               return (
                 <button
-                  key={anime.id}
+                  key={cat}
                   type="button"
-                  onClick={() => handleSelect(anime)}
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'text-primary border-b-2 border-primary bg-primary/5'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="h-3 w-3" />
+                  {categoryLabels[cat]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Results */}
+          {results.length > 0 ? (
+            <div className="max-h-[400px] overflow-y-auto">
+              {results.map((result, index) => (
+                <button
+                  key={`${result.type}-${result.id}`}
+                  type="button"
+                  onClick={() => handleSelect(result)}
                   className={`w-full flex items-center gap-3 p-3 text-left transition-colors hover:bg-secondary/80 ${
                     index === selectedIndex ? 'bg-secondary' : ''
                   }`}
                 >
                   <div className="relative w-12 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-secondary">
                     <Image
-                      src={imageUrl}
-                      alt={anime.title_ru}
+                      src={result.imageUrl}
+                      alt={result.title}
                       fill
                       className="object-cover"
                       sizes="48px"
@@ -147,53 +252,52 @@ export function SearchAutocomplete({ className, onSelect }: SearchAutocompletePr
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">
-                      {anime.title_ru}
+                      {result.title}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      {anime.year && (
+                      {result.year && (
                         <span className="text-xs text-muted-foreground">
-                          {anime.year}
+                          {result.year}
                         </span>
                       )}
-                      {anime.grade !== undefined && anime.grade > 0 && (
+                      {result.rating !== undefined && result.rating > 0 && (
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          {anime.grade.toFixed(1)}
+                          {result.rating.toFixed(1)}
                         </span>
                       )}
-                      {anime.episodes_total && (
+                      {result.episodes && (
                         <span className="text-xs text-muted-foreground">
-                          {anime.episodes_released || anime.episodes_total} эп.
+                          {result.episodes}
                         </span>
                       )}
                     </div>
                   </div>
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : query.trim() && !isLoading ? (
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground text-center">
+                Ничего не найдено
+              </p>
+            </div>
+          ) : null}
 
           {/* Footer - show all results */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              onSelect?.();
-              router.push(`/search?q=${encodeURIComponent(query)}`);
-            }}
-            className="w-full p-3 text-sm text-center text-primary hover:bg-secondary/50 border-t border-border transition-colors"
-          >
-            Показать все результаты
-          </button>
-        </div>
-      )}
-
-      {/* No results */}
-      {isOpen && query.trim() && !isLoading && results.length === 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <p className="text-sm text-muted-foreground text-center">
-            Ничего не найдено
-          </p>
+          {query.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onSelect?.();
+                router.push(`/search?q=${encodeURIComponent(query)}&category=${category}`);
+              }}
+              className="w-full p-3 text-sm text-center text-primary hover:bg-secondary/50 border-t border-border transition-colors"
+            >
+              Показать все результаты
+            </button>
+          )}
         </div>
       )}
     </div>
