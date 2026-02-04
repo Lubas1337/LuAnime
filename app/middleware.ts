@@ -6,9 +6,10 @@ export function middleware(request: NextRequest) {
 
   // Redirect anime.lubax.net to watch.lubax.net
   if (host.includes('anime.lubax.net')) {
-    const url = request.nextUrl.clone();
-    url.host = 'watch.lubax.net';
-    return NextResponse.redirect(url, 301);
+    const pathname = request.nextUrl.pathname;
+    const search = request.nextUrl.search;
+    const newUrl = `https://watch.lubax.net${pathname}${search}`;
+    return NextResponse.redirect(newUrl, 301);
   }
 
   return NextResponse.next();
