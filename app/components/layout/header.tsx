@@ -11,6 +11,7 @@ const navLinks = [
   { href: '/', label: 'Главная' },
   { href: '/search', label: 'Каталог' },
   { href: '/movies', label: 'Кино' },
+  { href: '/series', label: 'Сериалы' },
 ];
 
 export function Header() {

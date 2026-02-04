@@ -75,6 +75,31 @@ export interface SearchMoviesResponse {
   films: MoviePreview[];
 }
 
+export interface FilmsResponse {
+  total: number;
+  totalPages: number;
+  items: MoviePreview[];
+}
+
+export interface Episode {
+  seasonNumber: number;
+  episodeNumber: number;
+  nameRu?: string;
+  nameEn?: string;
+  synopsis?: string;
+  releaseDate?: string;
+}
+
+export interface Season {
+  number: number;
+  episodes: Episode[];
+}
+
+export interface SeasonsResponse {
+  total: number;
+  items: Season[];
+}
+
 export interface HDRezkaSearchResult {
   url: string;
   title: string;

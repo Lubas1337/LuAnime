@@ -5,6 +5,8 @@ import type {
   PremieresResponse,
   SearchMoviesResponse,
   MovieVideosResponse,
+  FilmsResponse,
+  SeasonsResponse,
 } from '@/types/movie';
 
 const API_BASE = '/api/kinopoisk';
@@ -67,6 +69,46 @@ class KinopoiskClient {
     posterUrl?: string;
   }>> {
     return this.request(`/v1/staff?filmId=${id}`);
+  }
+
+  async getSeries(
+    page: number = 1,
+    order: 'RATING' | 'NUM_VOTE' | 'YEAR' = 'RATING'
+  ): Promise<FilmsResponse> {
+    return this.request<FilmsResponse>(
+      `/v2.2/films?type=TV_SERIES&order=${order}&page=${page}`
+    );
+  }
+
+  async getMiniSeries(
+    page: number = 1,
+    order: 'RATING' | 'NUM_VOTE' | 'YEAR' = 'RATING'
+  ): Promise<FilmsResponse> {
+    return this.request<FilmsResponse>(
+      `/v2.2/films?type=MINI_SERIES&order=${order}&page=${page}`
+    );
+  }
+
+  async getSeriesByGenre(
+    genreId: number,
+    page: number = 1
+  ): Promise<FilmsResponse> {
+    return this.request<FilmsResponse>(
+      `/v2.2/films?type=TV_SERIES&genres=${genreId}&order=RATING&page=${page}`
+    );
+  }
+
+  async getSeasons(id: number): Promise<SeasonsResponse> {
+    return this.request<SeasonsResponse>(`/v2.2/films/${id}/seasons`);
+  }
+
+  async getSeriesCollections(
+    collectionType: 'TOP_POPULAR_ALL' | 'TOP_POPULAR_MOVIES' | 'VAMPIRE_THEME' | 'COMICS_THEME',
+    page: number = 1
+  ): Promise<FilmsResponse> {
+    return this.request<FilmsResponse>(
+      `/v2.2/films/collections?type=${collectionType}&page=${page}`
+    );
   }
 }
 
