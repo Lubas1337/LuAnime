@@ -28,8 +28,14 @@ export function SeasonEpisodeList({
 }: SeasonEpisodeListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const selectedSeason = seasons.find(s => s.number === currentSeason);
-  const episodes = selectedSeason?.episodes || [];
+  // Sort seasons by number
+  const sortedSeasons = [...seasons].sort((a, b) => a.number - b.number);
+
+  const selectedSeason = sortedSeasons.find(s => s.number === currentSeason);
+  // Sort episodes by episode number
+  const episodes = [...(selectedSeason?.episodes || [])].sort(
+    (a, b) => a.episodeNumber - b.episodeNumber
+  );
 
   return (
     <div className="space-y-4">
@@ -40,7 +46,7 @@ export function SeasonEpisodeList({
 
         <div className="flex items-center gap-2">
           {/* Season selector */}
-          {seasons.length > 1 && (
+          {sortedSeasons.length > 1 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
@@ -49,7 +55,7 @@ export function SeasonEpisodeList({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
-                {seasons.map((season) => (
+                {sortedSeasons.map((season) => (
                   <DropdownMenuItem
                     key={season.number}
                     onClick={() => onSeasonSelect(season.number)}

@@ -85,13 +85,20 @@ export default function SeriesPage({ params }: SeriesPageProps) {
         ]);
 
         setSeries(seriesData);
-        setSeasons(seasonsData.items || []);
+        // Sort seasons by number and episodes within each season
+        const sortedSeasons = (seasonsData.items || [])
+          .map(season => ({
+            ...season,
+            episodes: [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber)
+          }))
+          .sort((a, b) => a.number - b.number);
+        setSeasons(sortedSeasons);
         setTrailers(trailersData.items?.filter((t) => t.site === 'YOUTUBE') || []);
         setSimilarSeries(similarData.items?.slice(0, 10) || []);
 
-        // Set first season as default
-        if (seasonsData.items && seasonsData.items.length > 0) {
-          setCurrentSeason(seasonsData.items[0].number);
+        // Set first season as default (smallest number after sorting)
+        if (sortedSeasons.length > 0) {
+          setCurrentSeason(sortedSeasons[0].number);
         }
 
         setLoading(false);
