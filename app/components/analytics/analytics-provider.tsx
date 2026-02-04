@@ -10,16 +10,22 @@ import {
   recordClick,
 } from '@/lib/analytics';
 
+const PAGE_VIEW_COOLDOWN = 60 * 1000; // 1 minute - don't count same page twice within this time
+
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const lastPathRef = useRef<string>('');
+  const lastViewTimeRef = useRef<number>(0);
   const dataRef = useRef(loadAnalytics());
   const sessionRef = useRef<ReturnType<typeof getOrCreateSession> | null>(null);
+  const initializedRef = useRef(false);
 
   // Initialize session
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (initializedRef.current) return;
 
+    initializedRef.current = true;
     const data = loadAnalytics();
     dataRef.current = data;
     sessionRef.current = getOrCreateSession(data);
@@ -30,9 +36,16 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!sessionRef.current) return;
-    if (pathname === lastPathRef.current) return;
+
+    const now = Date.now();
+    const isSamePage = pathname === lastPathRef.current;
+    const isTooSoon = now - lastViewTimeRef.current < PAGE_VIEW_COOLDOWN;
+
+    // Skip if same page and within cooldown
+    if (isSamePage && isTooSoon) return;
 
     lastPathRef.current = pathname;
+    lastViewTimeRef.current = now;
 
     const data = dataRef.current;
     const { session } = sessionRef.current;
