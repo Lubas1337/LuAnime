@@ -26,7 +26,7 @@ export function Header() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-primary/30">
               <span className="text-lg font-bold text-primary-foreground">L</span>
             </div>
-            <span className="text-xl font-bold text-foreground transition-colors duration-300 group-hover:text-primary">LuAnime</span>
+            <span className="text-xl font-bold text-foreground transition-colors duration-300 group-hover:text-primary">LuWatch</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

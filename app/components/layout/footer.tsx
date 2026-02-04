@@ -10,10 +10,10 @@ export function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-bold text-primary-foreground">L</span>
               </div>
-              <span className="text-xl font-bold text-foreground">LuAnime</span>
+              <span className="text-xl font-bold text-foreground">LuWatch</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Смотрите аниме онлайн бесплатно в HD качестве
+              Смотрите фильмы, сериалы и аниме онлайн бесплатно
             </p>
           </div>
 
@@ -110,7 +110,7 @@ export function Footer() {
 
         <div className="mt-8 pt-8 border-t border-border">
           <p className="text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} LuAnime. Все права защищены.
+            &copy; {new Date().getFullYear()} LuWatch. Все права защищены.
           </p>
         </div>
       </div>
