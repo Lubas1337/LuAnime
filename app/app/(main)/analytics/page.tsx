@@ -8,13 +8,25 @@ import {
   Eye,
   Clock,
   Globe,
-  ArrowUpRight,
   TrendingUp,
-  Calendar,
   Activity,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
-import { loadAnalytics, getRealtimeVisitors } from '@/lib/analytics';
-import type { AnalyticsData, AnalyticsOverview } from '@/lib/analytics';
+import type { AnalyticsOverview, PageView, ClickEvent } from '@/lib/analytics/types';
+
+interface ActiveSession {
+  id: string;
+  userAgent: string;
+  lastActivity: number;
+  pageViews: number;
+  screenWidth: number;
+  screenHeight: number;
+}
+
+interface ExtendedOverview extends AnalyticsOverview {
+  activeSessions: ActiveSession[];
+}
 
 function StatCard({
   title,
@@ -70,7 +82,7 @@ function DailyChart({ data }: { data: { date: string; pageViews: number; visitor
       </div>
 
       <div className="flex items-end gap-2 h-48">
-        {data.map((day, index) => {
+        {data.map((day) => {
           const pageViewHeight = (day.pageViews / maxValue) * 100;
           const visitorHeight = (day.visitors / maxValue) * 100;
           const clickHeight = (day.clicks / maxValue) * 100;
@@ -83,17 +95,17 @@ function DailyChart({ data }: { data: { date: string; pageViews: number; visitor
               <div className="w-full flex items-end justify-center gap-1 h-40">
                 <div
                   className="w-3 bg-primary/80 rounded-t transition-all hover:bg-primary"
-                  style={{ height: `${pageViewHeight}%` }}
+                  style={{ height: `${Math.max(pageViewHeight, 2)}%` }}
                   title={`Просмотры: ${day.pageViews}`}
                 />
                 <div
                   className="w-3 bg-blue-500/80 rounded-t transition-all hover:bg-blue-500"
-                  style={{ height: `${visitorHeight}%` }}
+                  style={{ height: `${Math.max(visitorHeight, 2)}%` }}
                   title={`Посетители: ${day.visitors}`}
                 />
                 <div
                   className="w-3 bg-green-500/80 rounded-t transition-all hover:bg-green-500"
-                  style={{ height: `${clickHeight}%` }}
+                  style={{ height: `${Math.max(clickHeight, 2)}%` }}
                   title={`Клики: ${day.clicks}`}
                 />
               </div>
@@ -173,7 +185,7 @@ function TopReferrersList({ referrers }: { referrers: { referrer: string; count:
       <div className="space-y-3">
         {referrers.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            Нет данных
+            Прямые заходы
           </p>
         ) : (
           referrers.slice(0, 10).map((ref, index) => {
@@ -210,12 +222,70 @@ function TopReferrersList({ referrers }: { referrers: { referrer: string; count:
   );
 }
 
+function ActiveSessionsList({ sessions }: { sessions: ActiveSession[] }) {
+  const getDeviceInfo = (ua: string, width: number) => {
+    const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua) || width < 768;
+    const browser = /Chrome/i.test(ua) ? 'Chrome' :
+                    /Firefox/i.test(ua) ? 'Firefox' :
+                    /Safari/i.test(ua) ? 'Safari' :
+                    /Edge/i.test(ua) ? 'Edge' : 'Other';
+    return { isMobile, browser };
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Users className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-semibold text-foreground">Онлайн сейчас</h3>
+        <span className="ml-auto text-sm font-medium text-primary">{sessions.length}</span>
+      </div>
+
+      <div className="space-y-3 max-h-64 overflow-y-auto">
+        {sessions.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Нет активных посетителей
+          </p>
+        ) : (
+          sessions.map((session) => {
+            const { isMobile, browser } = getDeviceInfo(session.userAgent, session.screenWidth);
+            const timeAgo = Math.floor((Date.now() - session.lastActivity) / 1000);
+            const timeStr = timeAgo < 60 ? `${timeAgo}с назад` : `${Math.floor(timeAgo / 60)}м назад`;
+
+            return (
+              <div
+                key={session.id}
+                className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+              >
+                <div className={`p-1.5 rounded ${isMobile ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'}`}>
+                  {isMobile ? <Smartphone className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground">
+                    {browser} • {session.screenWidth}x{session.screenHeight}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {session.pageViews} просмотров • {timeStr}
+                  </p>
+                </div>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RecentActivityList({
   pageViews,
   clicks,
 }: {
-  pageViews: { path: string; timestamp: number; sessionId: string }[];
-  clicks: { path: string; element: string; text?: string; timestamp: number }[];
+  pageViews: PageView[];
+  clicks: ClickEvent[];
 }) {
   const activities = useMemo(() => {
     const all = [
@@ -231,7 +301,7 @@ function RecentActivityList({
 
     return all
       .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 20);
+      .slice(0, 30);
   }, [pageViews, clicks]);
 
   return (
@@ -251,6 +321,7 @@ function RecentActivityList({
             const time = new Date(activity.timestamp).toLocaleTimeString('ru-RU', {
               hour: '2-digit',
               minute: '2-digit',
+              second: '2-digit',
             });
 
             return (
@@ -281,7 +352,7 @@ function RecentActivityList({
                     </p>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">{time}</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{time}</span>
               </div>
             );
           })
@@ -291,121 +362,42 @@ function RecentActivityList({
   );
 }
 
-function computeOverview(data: AnalyticsData): AnalyticsOverview {
-  const now = Date.now();
-  const today = new Date().toISOString().split('T')[0];
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-
-  // Today stats
-  const todayStats = data.dailyStats[today] || {
-    pageViews: 0,
-    uniqueVisitors: 0,
-    totalClicks: 0,
-    topPages: [],
-    topReferrers: [],
-  };
-
-  // Week stats
-  let weekPageViews = 0;
-  let weekClicks = 0;
-  const weekSessions = new Set<string>();
-  const allTopPages: Record<string, number> = {};
-  const allReferrers: Record<string, number> = {};
-  const dailyData: AnalyticsOverview['dailyData'] = [];
-
-  // Generate last 7 days
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(now - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const stats = data.dailyStats[date];
-
-    if (stats) {
-      weekPageViews += stats.pageViews;
-      weekClicks += stats.totalClicks;
-      stats.sessions.forEach(s => weekSessions.add(s));
-
-      stats.topPages.forEach(p => {
-        allTopPages[p.path] = (allTopPages[p.path] || 0) + p.views;
-      });
-
-      stats.topReferrers.forEach(r => {
-        allReferrers[r.referrer] = (allReferrers[r.referrer] || 0) + r.count;
-      });
-
-      dailyData.push({
-        date,
-        pageViews: stats.pageViews,
-        visitors: stats.uniqueVisitors,
-        clicks: stats.totalClicks,
-      });
-    } else {
-      dailyData.push({
-        date,
-        pageViews: 0,
-        visitors: 0,
-        clicks: 0,
-      });
-    }
-  }
-
-  const topPages = Object.entries(allTopPages)
-    .map(([path, views]) => ({ path, views }))
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 10);
-
-  const topReferrers = Object.entries(allReferrers)
-    .map(([referrer, count]) => ({ referrer, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  // Recent activity
-  const recentPageViews = data.pageViews
-    .filter(pv => pv.timestamp > now - 24 * 60 * 60 * 1000)
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 20);
-
-  const recentClicks = data.clicks
-    .filter(c => c.timestamp > now - 24 * 60 * 60 * 1000)
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 20);
-
-  return {
-    today: {
-      pageViews: todayStats.pageViews,
-      uniqueVisitors: todayStats.uniqueVisitors,
-      clicks: todayStats.totalClicks,
-    },
-    week: {
-      pageViews: weekPageViews,
-      uniqueVisitors: weekSessions.size,
-      clicks: weekClicks,
-    },
-    realtimeVisitors: getRealtimeVisitors(data),
-    topPages,
-    topReferrers,
-    dailyData,
-    recentPageViews,
-    recentClicks,
-  };
-}
-
 export default function AnalyticsPage() {
-  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [overview, setOverview] = useState<ExtendedOverview | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = () => {
-      const data = loadAnalytics();
-      const computed = computeOverview(data);
-      setOverview(computed);
-      setLastUpdate(new Date());
+    const loadData = async () => {
+      try {
+        const response = await fetch('/api/analytics');
+        if (!response.ok) throw new Error('Failed to fetch');
+        const data = await response.json();
+        setOverview(data);
+        setLastUpdate(new Date());
+        setError(null);
+      } catch (err) {
+        setError('Ошибка загрузки данных');
+        console.error('Analytics fetch error:', err);
+      }
     };
 
     loadData();
 
-    // Refresh every 2 seconds for realtime updates
-    const interval = setInterval(loadData, 2000);
+    // Refresh every 3 seconds for realtime updates
+    const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  if (error && !overview) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!overview) {
     return (
@@ -423,7 +415,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Аналитика</h1>
           <p className="text-muted-foreground mt-1">
-            Статистика посещений за последние 7 дней
+            Статистика всех посетителей за последние 7 дней
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -449,7 +441,7 @@ export default function AnalyticsPage() {
           title="Онлайн сейчас"
           value={overview.realtimeVisitors}
           icon={Activity}
-          description="Посетителей за 5 мин"
+          description="Активных за 5 мин"
         />
         <StatCard
           title="Просмотры сегодня"
@@ -493,7 +485,8 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+        <ActiveSessionsList sessions={overview.activeSessions} />
         <TopPagesList pages={overview.topPages} />
         <TopReferrersList referrers={overview.topReferrers} />
         <RecentActivityList
