@@ -156,12 +156,13 @@ async function fetchCollapsData(
 export async function getMovieStream(
   kinopoiskId: number,
   season?: number,
-  episode?: number
+  episode?: number,
+  audio?: number
 ): Promise<VideoStream[]> {
   const streams: VideoStream[] = [];
 
   try {
-    const { data } = await fetchCollapsData(kinopoiskId, undefined, season, episode);
+    const { data } = await fetchCollapsData(kinopoiskId, audio, season, episode);
 
     if (!data) {
       return streams;

@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   ExternalLink,
   Tv,
+  Volume2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ export default function SeriesPage({ params }: SeriesPageProps) {
 
   const [currentSeason, setCurrentSeason] = useState(1);
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
+  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number>(0);
 
   const playerRef = useRef<HTMLDivElement>(null);
 
@@ -120,14 +122,21 @@ export default function SeriesPage({ params }: SeriesPageProps) {
     setPlayers([]);
   };
 
-  const handleEpisodeSelect = (episode: Episode) => {
+  const handleEpisodeSelect = (episode: Episode, audioIndex?: number) => {
     setCurrentEpisode(episode);
     setStreamLoading(true);
     setStreams([]);
     setPlayers([]);
 
-    // Fetch video streams from Kinobox
-    fetch(`/api/kinobox/stream?kp=${seriesId}&season=${episode.seasonNumber}&episode=${episode.episodeNumber}`)
+    const audio = audioIndex ?? selectedAudioIndex;
+
+    // Fetch video streams from Kinobox with audio parameter
+    let url = `/api/kinobox/stream?kp=${seriesId}&season=${episode.seasonNumber}&episode=${episode.episodeNumber}`;
+    if (audio > 0) {
+      url += `&audio=${audio}`;
+    }
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         if (data.streams?.length > 0) {
@@ -150,6 +159,13 @@ export default function SeriesPage({ params }: SeriesPageProps) {
           playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
       });
+  };
+
+  const handleTranslationSelect = (audioIndex: number) => {
+    setSelectedAudioIndex(audioIndex);
+    if (currentEpisode) {
+      handleEpisodeSelect(currentEpisode, audioIndex);
+    }
   };
 
   const handleNextEpisode = () => {
@@ -384,15 +400,33 @@ export default function SeriesPage({ params }: SeriesPageProps) {
 
                   {currentEpisode && (
                     <div ref={playerRef} className="space-y-4 scroll-mt-4">
-                      <h2 className="text-xl font-bold text-foreground">
-                        Сезон {currentEpisode.seasonNumber}, Серия {currentEpisode.episodeNumber}
-                        {currentEpisode.nameRu && ` — ${currentEpisode.nameRu}`}
-                      </h2>
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-foreground">
+                          Сезон {currentEpisode.seasonNumber}, Серия {currentEpisode.episodeNumber}
+                          {currentEpisode.nameRu && ` — ${currentEpisode.nameRu}`}
+                        </h2>
+                        {translations.length > 1 && (
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="h-4 w-4 text-muted-foreground" />
+                            <select
+                              value={selectedAudioIndex}
+                              onChange={(e) => handleTranslationSelect(parseInt(e.target.value))}
+                              className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                              disabled={streamLoading}
+                            >
+                              {translations.map((t, idx) => (
+                                <option key={idx} value={t.id ?? idx}>
+                                  {t.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                       <div className="rounded-xl overflow-hidden bg-black">
                         <MoviePlayer
                           streams={streams}
                           players={players}
-                          translations={translations}
                           kinopoiskId={seriesId}
                           season={currentEpisode.seasonNumber}
                           episode={currentEpisode.episodeNumber}

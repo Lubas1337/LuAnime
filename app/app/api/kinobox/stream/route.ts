@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMovieStream, getMoviePlayers, getAvailableTranslations, parseTranslationStream } from '@/lib/kinobox-parser';
+import { getMovieStream, getMoviePlayers, getAvailableTranslations } from '@/lib/kinobox-parser';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -8,9 +8,9 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const kinopoiskId = searchParams.get('kp');
-    const translationUrl = searchParams.get('translation');
     const seasonParam = searchParams.get('season');
     const episodeParam = searchParams.get('episode');
+    const audioParam = searchParams.get('audio');
 
     if (!kinopoiskId) {
       return NextResponse.json(
@@ -27,27 +27,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse season and episode if provided
+    // Parse parameters
     const season = seasonParam ? parseInt(seasonParam, 10) : undefined;
     const episode = episodeParam ? parseInt(episodeParam, 10) : undefined;
+    const audio = audioParam ? parseInt(audioParam, 10) : undefined;
 
-    // If specific translation/audio ID provided, parse just that
-    if (translationUrl) {
-      console.log('Loading specific translation:', translationUrl, 'for kp:', id);
-      const stream = await parseTranslationStream(translationUrl, id, season, episode);
-      console.log('Translation stream result:', stream ? 'found' : 'not found');
-      return NextResponse.json({
-        stream,
-      });
-    }
+    // Get direct streams with audio parameter
+    const streams = await getMovieStream(id, season, episode, audio);
 
-    // Try to get direct streams first (with season/episode for series)
-    const streams = await getMovieStream(id, season, episode);
-
-    // Also get iframe players as fallback (with season/episode for series)
+    // Get iframe players as fallback
     const players = await getMoviePlayers(id, season, episode);
 
-    // Get available translations for selection (with season/episode for series)
+    // Get available translations for selection
     const translations = await getAvailableTranslations(id, season, episode);
 
     return NextResponse.json({
