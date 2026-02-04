@@ -358,10 +358,10 @@ export function MoviePlayer({
     }
   };
 
-  // Load a specific translation
-  const loadTranslation = async (translation: Translation) => {
-    if (!kinopoiskId || !translation.id) {
-      console.error('Missing kinopoiskId or translation.id');
+  // Load a specific translation (audio track)
+  const loadTranslation = async (translation: Translation, index: number) => {
+    if (!kinopoiskId) {
+      console.error('Missing kinopoiskId');
       return;
     }
 
@@ -371,7 +371,8 @@ export function MoviePlayer({
       const currentPos = videoRef.current?.currentTime || 0;
       const wasPlaying = isPlayingRef.current;
 
-      let url = `/api/kinobox/stream?kp=${kinopoiskId}&translation=${encodeURIComponent(String(translation.id))}`;
+      // Use audio parameter with index
+      let url = `/api/kinobox/stream?kp=${kinopoiskId}&audio=${index}`;
       if (season !== undefined) url += `&season=${season}`;
       if (episode !== undefined) url += `&episode=${episode}`;
 
@@ -384,9 +385,10 @@ export function MoviePlayer({
 
       const data = await response.json();
 
-      if (data.stream?.url) {
+      // Get first stream from streams array
+      if (data.streams?.[0]?.url) {
         // Load new stream
-        initVideo(data.stream.url);
+        initVideo(data.streams[0].url);
         setCurrentTranslationName(translation.name);
 
         // Restore position and play state after video loads
@@ -783,7 +785,7 @@ export function MoviePlayer({
                     {translations.map((translation, index) => (
                       <DropdownMenuItem
                         key={index}
-                        onClick={() => loadTranslation(translation)}
+                        onClick={() => loadTranslation(translation, index)}
                         disabled={loadingTranslation}
                         className={currentTranslationName === translation.name ? 'bg-primary/20' : ''}
                       >
