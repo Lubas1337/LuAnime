@@ -98,13 +98,52 @@ function parseCollapsData(html: string): CollapsData | null {
     // Remove newlines for easier matching
     const cleanHtml = html.replace(/\n/g, '');
 
-    // Find makePlayer({...});
-    const match = cleanHtml.match(/makePlayer\(\{([\s\S]*?)\}\);/);
-    if (!match) return null;
+    // Find makePlayer( start position
+    const startMarker = 'makePlayer({';
+    const startIdx = cleanHtml.indexOf(startMarker);
+    if (startIdx === -1) return null;
 
-    // Use Function constructor to safely evaluate the object
+    // Find matching closing brace by counting braces
+    let braceCount = 0;
+    let inString = false;
+    let stringChar = '';
+    let endIdx = -1;
+
+    for (let i = startIdx + startMarker.length - 1; i < cleanHtml.length; i++) {
+      const char = cleanHtml[i];
+      const prevChar = i > 0 ? cleanHtml[i - 1] : '';
+
+      // Handle string boundaries
+      if ((char === '"' || char === "'") && prevChar !== '\\') {
+        if (!inString) {
+          inString = true;
+          stringChar = char;
+        } else if (char === stringChar) {
+          inString = false;
+        }
+      }
+
+      // Count braces only outside strings
+      if (!inString) {
+        if (char === '{') braceCount++;
+        else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            endIdx = i;
+            break;
+          }
+        }
+      }
+    }
+
+    if (endIdx === -1) return null;
+
+    // Extract the object content
+    const objectStr = cleanHtml.substring(startIdx + 'makePlayer('.length, endIdx + 1);
+
+    // Use Function constructor to evaluate the object
     // eslint-disable-next-line no-new-func
-    const data = new Function('return ({' + match[1] + '})')();
+    const data = new Function('return (' + objectStr + ')')();
     return data as CollapsData;
   } catch (error) {
     console.error('Failed to parse Collaps data:', error);

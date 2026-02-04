@@ -131,10 +131,7 @@ export default function SeriesPage({ params }: SeriesPageProps) {
     const audio = audioIndex ?? selectedAudioIndex;
 
     // Fetch video streams from Kinobox with audio parameter
-    let url = `/api/kinobox/stream?kp=${seriesId}&season=${episode.seasonNumber}&episode=${episode.episodeNumber}`;
-    if (audio > 0) {
-      url += `&audio=${audio}`;
-    }
+    const url = `/api/kinobox/stream?kp=${seriesId}&season=${episode.seasonNumber}&episode=${episode.episodeNumber}&audio=${audio}`;
 
     fetch(url)
       .then(res => res.json())
@@ -415,7 +412,7 @@ export default function SeriesPage({ params }: SeriesPageProps) {
                               disabled={streamLoading}
                             >
                               {translations.map((t, idx) => (
-                                <option key={idx} value={t.id ?? idx}>
+                                <option key={idx} value={idx}>
                                   {t.name}
                                 </option>
                               ))}
