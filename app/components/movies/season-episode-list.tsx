@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Grid, List, ChevronDown } from 'lucide-react';
+import { Play, Grid, List, ChevronDown, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,20 +11,33 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Season, Episode } from '@/types/movie';
 
+interface Translation {
+  id: string | number | null;
+  name: string;
+  quality: string;
+  source: string;
+}
+
 interface SeasonEpisodeListProps {
   seasons: Season[];
+  translations: Translation[];
   currentSeason: number;
   currentEpisode: number | null;
+  currentTranslation: Translation | null;
   onSeasonSelect: (seasonNumber: number) => void;
   onEpisodeSelect: (episode: Episode) => void;
+  onTranslationSelect: (translation: Translation, index: number) => void;
 }
 
 export function SeasonEpisodeList({
   seasons,
+  translations,
   currentSeason,
   currentEpisode,
+  currentTranslation,
   onSeasonSelect,
   onEpisodeSelect,
+  onTranslationSelect,
 }: SeasonEpisodeListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -44,7 +57,36 @@ export function SeasonEpisodeList({
           Серии ({episodes.length})
         </h3>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Translation/Audio selector */}
+          {translations.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Volume2 className="h-4 w-4" />
+                  {currentTranslation?.name || 'Выбрать озвучку'}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+                {translations.map((translation, index) => (
+                  <DropdownMenuItem
+                    key={index}
+                    onClick={() => onTranslationSelect(translation, index)}
+                    className={currentTranslation?.name === translation.name ? 'bg-primary/20' : ''}
+                  >
+                    <div className="flex flex-col">
+                      <span>{translation.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {translation.quality} • {translation.source}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Season selector */}
           {sortedSeasons.length > 1 && (
             <DropdownMenu>

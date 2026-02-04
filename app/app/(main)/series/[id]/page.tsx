@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   ExternalLink,
   Tv,
-  Volume2,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -68,6 +67,7 @@ export default function SeriesPage({ params }: SeriesPageProps) {
   const [currentSeason, setCurrentSeason] = useState(1);
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number>(0);
+  const [currentTranslation, setCurrentTranslation] = useState<Translation | null>(null);
 
   const playerRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +101,21 @@ export default function SeriesPage({ params }: SeriesPageProps) {
         // Set first season as default (smallest number after sorting)
         if (sortedSeasons.length > 0) {
           setCurrentSeason(sortedSeasons[0].number);
+
+          // Load translations for first episode to show available audio options
+          const firstSeason = sortedSeasons[0];
+          if (firstSeason.episodes.length > 0) {
+            const firstEp = firstSeason.episodes[0];
+            fetch(`/api/kinobox/stream?kp=${seriesId}&season=${firstSeason.number}&episode=${firstEp.episodeNumber}&audio=0`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.translations?.length > 0) {
+                  setTranslations(data.translations);
+                  setCurrentTranslation(data.translations[0]);
+                }
+              })
+              .catch(err => console.error('Failed to load translations:', err));
+          }
         }
 
         setLoading(false);
@@ -144,6 +159,10 @@ export default function SeriesPage({ params }: SeriesPageProps) {
         }
         if (data.translations?.length > 0) {
           setTranslations(data.translations);
+          // Update current translation to match selected audio index
+          if (data.translations[audio]) {
+            setCurrentTranslation(data.translations[audio]);
+          }
         }
       })
       .catch(error => {
@@ -158,10 +177,11 @@ export default function SeriesPage({ params }: SeriesPageProps) {
       });
   };
 
-  const handleTranslationSelect = (audioIndex: number) => {
-    setSelectedAudioIndex(audioIndex);
+  const handleTranslationSelect = (translation: Translation, index: number) => {
+    setSelectedAudioIndex(index);
+    setCurrentTranslation(translation);
     if (currentEpisode) {
-      handleEpisodeSelect(currentEpisode, audioIndex);
+      handleEpisodeSelect(currentEpisode, index);
     }
   };
 
@@ -389,37 +409,21 @@ export default function SeriesPage({ params }: SeriesPageProps) {
                 <>
                   <SeasonEpisodeList
                     seasons={seasons}
+                    translations={translations}
                     currentSeason={currentSeason}
                     currentEpisode={currentEpisode?.episodeNumber || null}
+                    currentTranslation={currentTranslation}
                     onSeasonSelect={handleSeasonSelect}
                     onEpisodeSelect={handleEpisodeSelect}
+                    onTranslationSelect={handleTranslationSelect}
                   />
 
                   {currentEpisode && (
                     <div ref={playerRef} className="space-y-4 scroll-mt-4">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-foreground">
-                          Сезон {currentEpisode.seasonNumber}, Серия {currentEpisode.episodeNumber}
-                          {currentEpisode.nameRu && ` — ${currentEpisode.nameRu}`}
-                        </h2>
-                        {translations.length > 1 && (
-                          <div className="flex items-center gap-2">
-                            <Volume2 className="h-4 w-4 text-muted-foreground" />
-                            <select
-                              value={selectedAudioIndex}
-                              onChange={(e) => handleTranslationSelect(parseInt(e.target.value))}
-                              className="bg-card border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                              disabled={streamLoading}
-                            >
-                              {translations.map((t, idx) => (
-                                <option key={idx} value={idx}>
-                                  {t.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
+                      <h2 className="text-xl font-bold text-foreground">
+                        Сезон {currentEpisode.seasonNumber}, Серия {currentEpisode.episodeNumber}
+                        {currentEpisode.nameRu && ` — ${currentEpisode.nameRu}`}
+                      </h2>
                       <div className="rounded-xl overflow-hidden bg-black">
                         <MoviePlayer
                           streams={streams}
