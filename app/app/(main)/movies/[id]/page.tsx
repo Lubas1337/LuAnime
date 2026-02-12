@@ -62,6 +62,7 @@ export default function MoviePage({ params }: MoviePageProps) {
   const [loading, setLoading] = useState(true);
   const [streamLoading, setStreamLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('player');
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchMovie = async () => {
@@ -301,15 +302,27 @@ export default function MoviePage({ params }: MoviePageProps) {
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={() =>
+                  disabled={downloadProgress !== null}
+                  onClick={() => {
+                    setDownloadProgress(0);
                     downloadEpisode({
                       kinopoiskId: movieId,
                       title: movie.nameRu,
-                    })
-                  }
+                      onProgress: (pct) => setDownloadProgress(pct),
+                    })?.finally(() => setDownloadProgress(null));
+                  }}
                 >
-                  <Download className="h-4 w-4" />
-                  Скачать фильм
+                  {downloadProgress !== null ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {downloadProgress}%
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Скачать фильм
+                    </>
+                  )}
                 </Button>
               </div>
             </TabsContent>

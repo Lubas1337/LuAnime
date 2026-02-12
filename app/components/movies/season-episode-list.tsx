@@ -48,6 +48,7 @@ export function SeasonEpisodeList({
 }: SeasonEpisodeListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [downloadingEp, setDownloadingEp] = useState<number | null>(null);
+  const [downloadEpProgress, setDownloadEpProgress] = useState(0);
   const [downloadingSeason, setDownloadingSeason] = useState(false);
   const [seasonProgress, setSeasonProgress] = useState('');
 
@@ -62,15 +63,24 @@ export function SeasonEpisodeList({
 
   const handleDownloadEpisode = (e: React.MouseEvent, episode: Episode) => {
     e.stopPropagation();
+    if (downloadingEp !== null) return;
     setDownloadingEp(episode.episodeNumber);
-    downloadEpisode({
+    setDownloadEpProgress(0);
+    const result = downloadEpisode({
       kinopoiskId,
       season: currentSeason,
       episode: episode.episodeNumber,
       audio: audioIndex,
       title: seriesTitle,
+      onProgress: (pct) => setDownloadEpProgress(pct),
     });
-    setTimeout(() => setDownloadingEp(null), 3000);
+    result?.finally(() => {
+      setDownloadingEp(null);
+      setDownloadEpProgress(0);
+    });
+    if (!result) {
+      setTimeout(() => setDownloadingEp(null), 3000);
+    }
   };
 
   const handleDownloadSeason = async () => {
@@ -83,7 +93,10 @@ export function SeasonEpisodeList({
         audio: audioIndex,
         title: seriesTitle,
       },
-      (current, total) => setSeasonProgress(`${current}/${total}`),
+      (current, total, episodePct) => {
+        const pct = episodePct !== undefined ? ` (${episodePct}%)` : '';
+        setSeasonProgress(`${current}/${total}${pct}`);
+      },
     );
     setDownloadingSeason(false);
     setSeasonProgress('');
@@ -219,17 +232,19 @@ export function SeasonEpisodeList({
                 >
                   {episode.episodeNumber}
                 </button>
-                <button
-                  onClick={(e) => handleDownloadEpisode(e, episode)}
-                  className="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
-                  title="Скачать серию"
-                >
-                  {downloadingEp === episode.episodeNumber ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
+                {downloadingEp === episode.episodeNumber ? (
+                  <div className="absolute -top-1 -right-1 flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md text-[9px] font-bold">
+                    {downloadEpProgress}%
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => handleDownloadEpisode(e, episode)}
+                    className="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
+                    title="Скачать серию"
+                  >
                     <Download className="h-3 w-3" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -282,17 +297,19 @@ export function SeasonEpisodeList({
                   )}
                 </button>
 
-                <button
-                  onClick={(e) => handleDownloadEpisode(e, episode)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                  title="Скачать серию"
-                >
-                  {downloadingEp === episode.episodeNumber ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+                {downloadingEp === episode.episodeNumber ? (
+                  <span className="text-xs font-medium text-primary min-w-[3ch] text-right">
+                    {downloadEpProgress}%
+                  </span>
+                ) : (
+                  <button
+                    onClick={(e) => handleDownloadEpisode(e, episode)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                    title="Скачать серию"
+                  >
                     <Download className="h-4 w-4" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             ))}
           </div>
