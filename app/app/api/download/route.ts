@@ -246,11 +246,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No segments found' }, { status: 404 });
     }
 
-    // Stream segments sequentially with retry
+    // Stream segments with backpressure using pull-based approach
+    let segIdx = 0;
+    let currentReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
     const stream = new ReadableStream({
-      async start(controller) {
+      async pull(controller) {
         try {
-          for (const segUrl of segmentUrls) {
+          while (true) {
+            // Read from current segment reader
+            if (currentReader) {
+              const { done, value } = await currentReader.read();
+              if (!done && value) {
+                controller.enqueue(value);
+                return; // wait for next pull
+              }
+              currentReader = null;
+            }
+
+            // Move to next segment
+            if (segIdx >= segmentUrls.length) {
+              controller.close();
+              return;
+            }
+
+            const segUrl = segmentUrls[segIdx++];
             let lastErr: unknown;
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
@@ -260,21 +280,18 @@ export async function GET(request: NextRequest) {
                   lastErr = new Error(`HTTP ${segRes.status}`);
                   continue;
                 }
-                const reader = segRes.body.getReader();
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  controller.enqueue(value);
-                }
+                currentReader = segRes.body.getReader();
                 lastErr = null;
                 break;
               } catch (err) {
                 lastErr = err;
               }
             }
-            if (lastErr) console.error(`Segment failed after retries: ${segUrl}`, lastErr);
+            if (lastErr) {
+              console.error(`Segment failed after retries: ${segUrl}`, lastErr);
+              // skip this segment, continue loop to try next
+            }
           }
-          controller.close();
         } catch (err) {
           console.error('Segment streaming error:', err);
           controller.error(err);
