@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const COLLAPS_API = 'https://api.delivembd.ws/embed/kp/';
 
-function contentDisposition(filename: string): string {
-  const ascii = filename.replace(/[^\x20-\x7E]/g, '_');
-  const encoded = encodeURIComponent(filename);
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-}
-
 const CDN_HEADERS: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   'Referer': 'https://api.delivembd.ws/',
   'Origin': 'https://api.delivembd.ws',
 };
+
+function contentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, '_');
+  const encoded = encodeURIComponent(filename);
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
 
 function cleanStreamUrl(url: string): string {
   return url
@@ -119,12 +118,10 @@ async function fetchCollapsHlsUrl(
   const data = parseCollapsData(html);
   if (!data) return null;
 
-  // Movie
   if (data.source?.hls) {
     return cleanStreamUrl(data.source.hls);
   }
 
-  // Series episode
   if (data.playlist?.seasons && season !== undefined && episode !== undefined) {
     const seasonData = data.playlist.seasons.find(s => s.season === season);
     const episodeData = seasonData?.episodes.find(e => parseInt(e.episode) === episode);
@@ -153,7 +150,6 @@ async function getBestVariantUrl(masterUrl: string): Promise<string> {
       const bwMatch = line.match(/BANDWIDTH=(\d+)/);
       const bandwidth = bwMatch ? parseInt(bwMatch[1]) : 0;
 
-      // Next non-empty, non-comment line is the URL
       for (let j = i + 1; j < lines.length; j++) {
         const next = lines[j].trim();
         if (next && !next.startsWith('#')) {
@@ -167,7 +163,6 @@ async function getBestVariantUrl(masterUrl: string): Promise<string> {
     }
   }
 
-  // If no variant found, it might be a direct playlist
   if (!bestUrl) return masterUrl;
   return bestUrl;
 }
@@ -187,6 +182,42 @@ async function getSegmentUrls(playlistUrl: string): Promise<string[]> {
   }
 
   return segments;
+}
+
+// Cache resolved segments (10 min TTL)
+const segmentCache = new Map<string, { urls: string[]; expires: number }>();
+
+function getCacheKey(kp: string, audio?: string, season?: string, episode?: string) {
+  return `${kp}:${audio || ''}:${season || ''}:${episode || ''}`;
+}
+
+async function resolveSegments(
+  kp: string, audio?: string, season?: string, episode?: string
+): Promise<string[] | null> {
+  const key = getCacheKey(kp, audio, season, episode);
+  const cached = segmentCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.urls;
+
+  const hlsUrl = await fetchCollapsHlsUrl(
+    parseInt(kp),
+    audio ? parseInt(audio) : undefined,
+    season ? parseInt(season) : undefined,
+    episode ? parseInt(episode) : undefined,
+  );
+  if (!hlsUrl) return null;
+
+  const variantUrl = await getBestVariantUrl(hlsUrl);
+  const urls = await getSegmentUrls(variantUrl);
+  if (urls.length === 0) return null;
+
+  segmentCache.set(key, { urls, expires: Date.now() + 10 * 60 * 1000 });
+
+  // Cleanup old entries
+  for (const [k, v] of segmentCache) {
+    if (v.expires < Date.now()) segmentCache.delete(k);
+  }
+
+  return urls;
 }
 
 export async function GET(request: NextRequest) {
@@ -217,105 +248,56 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Mode 2: HLS download (movies/series)
+  // Mode 2: HLS (movies/series)
   const kp = searchParams.get('kp');
   if (!kp) {
     return NextResponse.json({ error: 'Missing kp or url parameter' }, { status: 400 });
   }
 
-  const season = searchParams.get('season');
-  const episode = searchParams.get('episode');
-  const audio = searchParams.get('audio');
-  const filename = searchParams.get('filename') || 'video.mp4';
+  const season = searchParams.get('season') || undefined;
+  const episode = searchParams.get('episode') || undefined;
+  const audio = searchParams.get('audio') || undefined;
 
-  try {
-
-    const hlsUrl = await fetchCollapsHlsUrl(
-      parseInt(kp),
-      audio ? parseInt(audio) : undefined,
-      season ? parseInt(season) : undefined,
-      episode ? parseInt(episode) : undefined,
-    );
-
-    if (!hlsUrl) {
-      return NextResponse.json({ error: 'Could not resolve HLS URL' }, { status: 404 });
-    }
-
-    const variantUrl = await getBestVariantUrl(hlsUrl);
-
-    const segmentUrls = await getSegmentUrls(variantUrl);
-
-    if (segmentUrls.length === 0) {
-      return NextResponse.json({ error: 'No segments found' }, { status: 404 });
-    }
-
-    // Remux TS segments to MP4 via ffmpeg
-    const mp4Filename = filename.replace(/\.ts$/, '.mp4');
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', 'pipe:0',
-      '-c', 'copy',
-      '-f', 'mp4',
-      '-movflags', 'frag_keyframe+empty_moov',
-      'pipe:1',
-    ], { stdio: ['pipe', 'pipe', 'pipe'] });
-
-    // Feed segments into ffmpeg stdin sequentially (streaming, not buffering)
-    (async () => {
-      try {
-        for (const segUrl of segmentUrls) {
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
-              const res = await fetch(segUrl, { headers: CDN_HEADERS });
-              if (!res.ok || !res.body) continue;
-              const reader = res.body.getReader();
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const canWrite = ffmpeg.stdin.write(value);
-                if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
-              }
-              break;
-            } catch { /* retry */ }
-          }
-        }
-      } catch (err) {
-        console.error('Segment feed error:', err);
-      } finally {
-        ffmpeg.stdin.end();
+  // Mode 2a: Resolve segments — returns total count for client-side parallel download
+  if (searchParams.has('resolve')) {
+    try {
+      const urls = await resolveSegments(kp, audio, season, episode);
+      if (!urls) {
+        return NextResponse.json({ error: 'Could not resolve HLS URL' }, { status: 404 });
       }
-    })();
-
-    let stderrLog = '';
-    ffmpeg.stderr.on('data', (chunk: Buffer) => { stderrLog += chunk.toString(); });
-    ffmpeg.on('close', (code: number) => {
-      if (code !== 0) console.error('ffmpeg exited with code', code, stderrLog.slice(-500));
-    });
-
-    // Convert Node stream to web ReadableStream manually for Bun compatibility
-    const stream = new ReadableStream({
-      start(controller) {
-        ffmpeg.stdout.on('data', (chunk: Buffer) => {
-          controller.enqueue(new Uint8Array(chunk));
-        });
-        ffmpeg.stdout.on('end', () => {
-          controller.close();
-        });
-        ffmpeg.stdout.on('error', (err) => {
-          console.error('ffmpeg stdout error:', err);
-          controller.error(err);
-        });
-      },
-    });
-
-    return new NextResponse(stream, {
-      headers: {
-        'Content-Disposition': contentDisposition(mp4Filename),
-        'Content-Type': 'video/mp4',
-      },
-    });
-  } catch (error) {
-    console.error('HLS download error:', error);
-    return NextResponse.json({ error: 'Download failed' }, { status: 500 });
+      return NextResponse.json({ total: urls.length });
+    } catch (error) {
+      console.error('Resolve error:', error);
+      return NextResponse.json({ error: 'Failed to resolve' }, { status: 500 });
+    }
   }
+
+  // Mode 2b: Proxy single segment
+  const segIdx = searchParams.get('seg');
+  if (segIdx !== null) {
+    try {
+      const urls = await resolveSegments(kp, audio, season, episode);
+      if (!urls) {
+        return NextResponse.json({ error: 'Not resolved' }, { status: 404 });
+      }
+      const idx = parseInt(segIdx);
+      if (idx < 0 || idx >= urls.length) {
+        return NextResponse.json({ error: 'Segment out of range' }, { status: 400 });
+      }
+
+      const res = await fetch(urls[idx], { headers: CDN_HEADERS });
+      if (!res.ok || !res.body) {
+        return NextResponse.json({ error: 'Segment fetch failed' }, { status: 502 });
+      }
+
+      return new NextResponse(res.body, {
+        headers: { 'Content-Type': 'video/mp2t' },
+      });
+    } catch (error) {
+      console.error('Segment proxy error:', error);
+      return NextResponse.json({ error: 'Segment failed' }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ error: 'Missing resolve or seg parameter' }, { status: 400 });
 }

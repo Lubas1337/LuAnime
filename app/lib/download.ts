@@ -1,3 +1,5 @@
+const CONCURRENCY = 10;
+
 function buildFilename(title: string, season?: number, episode?: number, ext = 'mp4'): string {
   const clean = title.replace(/[^\w\sа-яА-ЯёЁ-]/g, '').trim().replace(/\s+/g, '_');
   if (season !== undefined && episode !== undefined) {
@@ -8,36 +10,81 @@ function buildFilename(title: string, season?: number, episode?: number, ext = '
   return `${clean}.${ext}`;
 }
 
+async function downloadHLS(
+  baseParams: string,
+  filename: string,
+  onProgress?: (pct: number) => void,
+) {
+  // 1. Resolve segment count
+  const resolveRes = await fetch(`/api/download?${baseParams}&resolve=1`);
+  if (!resolveRes.ok) throw new Error('Failed to resolve');
+  const { total } = await resolveRes.json();
+
+  // 2. Download segments in parallel with concurrency limit
+  const segments: ArrayBuffer[] = new Array(total);
+  let completed = 0;
+  let nextIdx = 0;
+
+  async function downloadSegment(idx: number) {
+    const res = await fetch(`/api/download?${baseParams}&seg=${idx}`);
+    if (!res.ok) throw new Error(`Segment ${idx} failed`);
+    segments[idx] = await res.arrayBuffer();
+    completed++;
+    onProgress?.(Math.round((completed / total) * 100));
+  }
+
+  async function worker() {
+    while (true) {
+      const idx = nextIdx++;
+      if (idx >= total) break;
+      await downloadSegment(idx);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker());
+  await Promise.all(workers);
+
+  // 3. Concatenate and download
+  const blob = new Blob(segments, { type: 'video/mp2t' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function downloadEpisode(params: {
   kinopoiskId?: number;
   season?: number;
   episode?: number;
   audio?: number;
   title: string;
-  // For anime direct URL download
   directUrl?: string;
+  onProgress?: (pct: number) => void;
 }) {
-  const { kinopoiskId, season, episode, audio, title, directUrl } = params;
+  const { kinopoiskId, season, episode, audio, title, directUrl, onProgress } = params;
 
-  const filename = directUrl
-    ? buildFilename(title, undefined, episode, 'mp4')
-    : buildFilename(title, season, episode);
-
-  let url: string;
+  // Anime: direct URL — just open in new tab (fast, single file)
   if (directUrl) {
-    url = `/api/download?url=${encodeURIComponent(directUrl)}&filename=${encodeURIComponent(filename)}`;
-  } else {
-    const searchParams = new URLSearchParams();
-    searchParams.set('kp', String(kinopoiskId));
-    if (season !== undefined) searchParams.set('season', String(season));
-    if (episode !== undefined) searchParams.set('episode', String(episode));
-    if (audio !== undefined) searchParams.set('audio', String(audio));
-    searchParams.set('filename', filename);
-    url = `/api/download?${searchParams.toString()}`;
+    const filename = buildFilename(title, undefined, episode, 'mp4');
+    const url = `/api/download?url=${encodeURIComponent(directUrl)}&filename=${encodeURIComponent(filename)}`;
+    window.open(url, '_blank');
+    return;
   }
 
-  // Open in new tab to trigger download
-  window.open(url, '_blank');
+  // Movies/series: parallel HLS download
+  const filename = buildFilename(title, season, episode, 'ts');
+  const searchParams = new URLSearchParams();
+  searchParams.set('kp', String(kinopoiskId));
+  if (season !== undefined) searchParams.set('season', String(season));
+  if (episode !== undefined) searchParams.set('episode', String(episode));
+  if (audio !== undefined) searchParams.set('audio', String(audio));
+
+  downloadHLS(searchParams.toString(), filename, onProgress).catch(err => {
+    console.error('Download failed:', err);
+    alert('Ошибка скачивания');
+  });
 }
 
 export async function downloadSeason(
@@ -63,7 +110,6 @@ export async function downloadSeason(
       title: params.title,
     });
 
-    // Delay between downloads to avoid overwhelming the server
     if (i < sorted.length - 1) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
