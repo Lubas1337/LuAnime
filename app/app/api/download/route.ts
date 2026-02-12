@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import { Readable } from 'stream';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -289,17 +288,29 @@ export async function GET(request: NextRequest) {
       }
     })();
 
-    // Convert ffmpeg stdout (Node stream) to web ReadableStream
-    const nodeStream = ffmpeg.stdout;
-    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
-
     let stderrLog = '';
     ffmpeg.stderr.on('data', (chunk: Buffer) => { stderrLog += chunk.toString(); });
     ffmpeg.on('close', (code: number) => {
       if (code !== 0) console.error('ffmpeg exited with code', code, stderrLog.slice(-500));
     });
 
-    return new NextResponse(webStream, {
+    // Convert Node stream to web ReadableStream manually for Bun compatibility
+    const stream = new ReadableStream({
+      start(controller) {
+        ffmpeg.stdout.on('data', (chunk: Buffer) => {
+          controller.enqueue(new Uint8Array(chunk));
+        });
+        ffmpeg.stdout.on('end', () => {
+          controller.close();
+        });
+        ffmpeg.stdout.on('error', (err) => {
+          console.error('ffmpeg stdout error:', err);
+          controller.error(err);
+        });
+      },
+    });
+
+    return new NextResponse(stream, {
       headers: {
         'Content-Disposition': contentDisposition(mp4Filename),
         'Content-Type': 'video/mp4',
