@@ -259,38 +259,38 @@ export async function GET(request: NextRequest) {
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    // Feed segments into ffmpeg stdin, prefetching next segment while streaming current
+    // Feed segments with sliding window of concurrent fetches
+    const PREFETCH = 8;
     (async () => {
       try {
-        let nextFetch: Promise<Response | null> | null = null;
-
-        async function tryFetch(url: string): Promise<Response | null> {
+        async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
               const res = await fetch(url, { headers: CDN_HEADERS });
-              if (res.ok && res.body) return res;
+              if (res.ok) return res.arrayBuffer();
             } catch { /* retry */ }
           }
           return null;
         }
 
-        for (let i = 0; i < segmentUrls.length; i++) {
-          // Start fetching current segment (or use prefetched)
-          const currentFetch = nextFetch ?? tryFetch(segmentUrls[i]);
-          // Prefetch next segment while we stream current
-          nextFetch = (i + 1 < segmentUrls.length) ? tryFetch(segmentUrls[i + 1]) : null;
+        // Pre-start fetches for first batch
+        const pending: Array<Promise<ArrayBuffer | null>> = [];
+        let nextIdx = 0;
+        while (nextIdx < segmentUrls.length && pending.length < PREFETCH) {
+          pending.push(fetchBuf(segmentUrls[nextIdx++]));
+        }
 
-          const res = await currentFetch;
-          if (!res?.body) continue;
-
-          const reader = res.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const canWrite = ffmpeg.stdin.write(value);
-            if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
+        // Consume in order, refill queue
+        while (pending.length > 0) {
+          const buf = await pending.shift()!;
+          // Refill
+          if (nextIdx < segmentUrls.length) {
+            pending.push(fetchBuf(segmentUrls[nextIdx++]));
           }
+          if (!buf) continue;
+          const canWrite = ffmpeg.stdin.write(Buffer.from(buf));
+          if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
         }
       } catch (err) {
         console.error('Segment feed error:', err);
