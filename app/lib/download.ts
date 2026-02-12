@@ -1,6 +1,7 @@
 const CONCURRENCY = 10;
+const MAX_RETRIES = 3;
 
-function buildFilename(title: string, season?: number, episode?: number, ext = 'mp4'): string {
+function buildFilename(title: string, season?: number, episode?: number, ext = 'ts'): string {
   const clean = title.replace(/[^\w\sа-яА-ЯёЁ-]/g, '').trim().replace(/\s+/g, '_');
   if (season !== undefined && episode !== undefined) {
     const s = String(season).padStart(2, '0');
@@ -10,14 +11,26 @@ function buildFilename(title: string, season?: number, episode?: number, ext = '
   return `${clean}.${ext}`;
 }
 
+async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res;
+    } catch {
+      // retry
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+  }
+  throw new Error(`Failed after ${retries} retries: ${url}`);
+}
+
 async function downloadHLS(
   baseParams: string,
   filename: string,
   onProgress?: (pct: number) => void,
 ) {
   // 1. Resolve segment count
-  const resolveRes = await fetch(`/api/download?${baseParams}&resolve=1`);
-  if (!resolveRes.ok) throw new Error('Failed to resolve');
+  const resolveRes = await fetchWithRetry(`/api/download?${baseParams}&resolve=1`);
   const { total } = await resolveRes.json();
 
   // 2. Download segments in parallel with concurrency limit
@@ -25,19 +38,14 @@ async function downloadHLS(
   let completed = 0;
   let nextIdx = 0;
 
-  async function downloadSegment(idx: number) {
-    const res = await fetch(`/api/download?${baseParams}&seg=${idx}`);
-    if (!res.ok) throw new Error(`Segment ${idx} failed`);
-    segments[idx] = await res.arrayBuffer();
-    completed++;
-    onProgress?.(Math.round((completed / total) * 100));
-  }
-
   async function worker() {
     while (true) {
       const idx = nextIdx++;
       if (idx >= total) break;
-      await downloadSegment(idx);
+      const res = await fetchWithRetry(`/api/download?${baseParams}&seg=${idx}`);
+      segments[idx] = await res.arrayBuffer();
+      completed++;
+      onProgress?.(Math.round((completed / total) * 100));
     }
   }
 
@@ -50,8 +58,10 @@ async function downloadHLS(
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 export function downloadEpisode(params: {
@@ -74,7 +84,7 @@ export function downloadEpisode(params: {
   }
 
   // Movies/series: parallel HLS download
-  const filename = buildFilename(title, season, episode, 'ts');
+  const filename = buildFilename(title, season, episode);
   const searchParams = new URLSearchParams();
   searchParams.set('kp', String(kinopoiskId));
   if (season !== undefined) searchParams.set('season', String(season));
@@ -83,7 +93,6 @@ export function downloadEpisode(params: {
 
   downloadHLS(searchParams.toString(), filename, onProgress).catch(err => {
     console.error('Download failed:', err);
-    alert('Ошибка скачивания');
   });
 }
 
