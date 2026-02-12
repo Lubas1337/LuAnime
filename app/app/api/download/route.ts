@@ -259,26 +259,41 @@ export async function GET(request: NextRequest) {
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    // Feed segments into ffmpeg stdin
+    // Feed segments into ffmpeg stdin with concurrent prefetch
+    const CONCURRENCY = 6;
     (async () => {
       try {
-        for (const segUrl of segmentUrls) {
+        const queue: Array<Promise<Uint8Array | null>> = [];
+
+        async function fetchSegment(url: string): Promise<Uint8Array | null> {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
-              if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
-              const segRes = await fetch(segUrl, { headers: CDN_HEADERS });
-              if (!segRes.ok || !segRes.body) continue;
-              const reader = segRes.body.getReader();
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const canWrite = ffmpeg.stdin.write(value);
-                if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
-              }
-              break;
+              if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
+              const res = await fetch(url, { headers: CDN_HEADERS });
+              if (!res.ok || !res.body) continue;
+              return new Uint8Array(await res.arrayBuffer());
             } catch {
               // retry
             }
+          }
+          return null;
+        }
+
+        // Start initial batch
+        let nextIdx = 0;
+        while (nextIdx < segmentUrls.length && queue.length < CONCURRENCY) {
+          queue.push(fetchSegment(segmentUrls[nextIdx++]));
+        }
+
+        // Process in order, refilling the queue
+        while (queue.length > 0) {
+          const data = await queue.shift()!;
+          if (nextIdx < segmentUrls.length) {
+            queue.push(fetchSegment(segmentUrls[nextIdx++]));
+          }
+          if (data) {
+            const canWrite = ffmpeg.stdin.write(data);
+            if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
           }
         }
       } catch (err) {
