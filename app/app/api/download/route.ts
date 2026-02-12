@@ -259,38 +259,25 @@ export async function GET(request: NextRequest) {
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    // Feed segments with sliding window of concurrent fetches
-    const PREFETCH = 8;
+    // Feed segments into ffmpeg stdin sequentially (streaming, not buffering)
     (async () => {
       try {
-        async function fetchBuf(url: string): Promise<ArrayBuffer | null> {
+        for (const segUrl of segmentUrls) {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
-              const res = await fetch(url, { headers: CDN_HEADERS });
-              if (res.ok) return res.arrayBuffer();
+              const res = await fetch(segUrl, { headers: CDN_HEADERS });
+              if (!res.ok || !res.body) continue;
+              const reader = res.body.getReader();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const canWrite = ffmpeg.stdin.write(value);
+                if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
+              }
+              break;
             } catch { /* retry */ }
           }
-          return null;
-        }
-
-        // Pre-start fetches for first batch
-        const pending: Array<Promise<ArrayBuffer | null>> = [];
-        let nextIdx = 0;
-        while (nextIdx < segmentUrls.length && pending.length < PREFETCH) {
-          pending.push(fetchBuf(segmentUrls[nextIdx++]));
-        }
-
-        // Consume in order, refill queue
-        while (pending.length > 0) {
-          const buf = await pending.shift()!;
-          // Refill
-          if (nextIdx < segmentUrls.length) {
-            pending.push(fetchBuf(segmentUrls[nextIdx++]));
-          }
-          if (!buf) continue;
-          const canWrite = ffmpeg.stdin.write(Buffer.from(buf));
-          if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
         }
       } catch (err) {
         console.error('Segment feed error:', err);
