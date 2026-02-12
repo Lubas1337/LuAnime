@@ -293,7 +293,11 @@ export async function GET(request: NextRequest) {
     const nodeStream = ffmpeg.stdout;
     const webStream = Readable.toWeb(nodeStream) as ReadableStream;
 
-    ffmpeg.stderr.on('data', () => {}); // drain stderr to prevent blocking
+    let stderrLog = '';
+    ffmpeg.stderr.on('data', (chunk: Buffer) => { stderrLog += chunk.toString(); });
+    ffmpeg.on('close', (code: number) => {
+      if (code !== 0) console.error('ffmpeg exited with code', code, stderrLog.slice(-500));
+    });
 
     return new NextResponse(webStream, {
       headers: {
