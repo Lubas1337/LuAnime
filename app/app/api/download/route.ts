@@ -259,40 +259,36 @@ export async function GET(request: NextRequest) {
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    // Feed segments into ffmpeg stdin with concurrent prefetch
-    const CONCURRENCY = 6;
+    // Feed segments into ffmpeg stdin, prefetching next segment while streaming current
     (async () => {
       try {
-        const queue: Array<Promise<Uint8Array | null>> = [];
+        let nextFetch: Promise<Response | null> | null = null;
 
-        async function fetchSegment(url: string): Promise<Uint8Array | null> {
+        async function tryFetch(url: string): Promise<Response | null> {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
               const res = await fetch(url, { headers: CDN_HEADERS });
-              if (!res.ok || !res.body) continue;
-              return new Uint8Array(await res.arrayBuffer());
-            } catch {
-              // retry
-            }
+              if (res.ok && res.body) return res;
+            } catch { /* retry */ }
           }
           return null;
         }
 
-        // Start initial batch
-        let nextIdx = 0;
-        while (nextIdx < segmentUrls.length && queue.length < CONCURRENCY) {
-          queue.push(fetchSegment(segmentUrls[nextIdx++]));
-        }
+        for (let i = 0; i < segmentUrls.length; i++) {
+          // Start fetching current segment (or use prefetched)
+          const currentFetch = nextFetch ?? tryFetch(segmentUrls[i]);
+          // Prefetch next segment while we stream current
+          nextFetch = (i + 1 < segmentUrls.length) ? tryFetch(segmentUrls[i + 1]) : null;
 
-        // Process in order, refilling the queue
-        while (queue.length > 0) {
-          const data = await queue.shift()!;
-          if (nextIdx < segmentUrls.length) {
-            queue.push(fetchSegment(segmentUrls[nextIdx++]));
-          }
-          if (data) {
-            const canWrite = ffmpeg.stdin.write(data);
+          const res = await currentFetch;
+          if (!res?.body) continue;
+
+          const reader = res.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const canWrite = ffmpeg.stdin.write(value);
             if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
           }
         }
