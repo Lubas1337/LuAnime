@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Grid, List } from 'lucide-react';
+import { Play, Grid, List, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { downloadEpisode } from '@/lib/download';
 import type { Episode, Translation } from '@/types/anime';
 
 interface EpisodeListProps {
@@ -18,6 +19,7 @@ interface EpisodeListProps {
   currentTranslation: Translation | null;
   onEpisodeSelect: (episode: Episode) => void;
   onTranslationSelect: (translation: Translation) => void;
+  animeTitle: string;
 }
 
 export function EpisodeList({
@@ -27,8 +29,26 @@ export function EpisodeList({
   currentTranslation,
   onEpisodeSelect,
   onTranslationSelect,
+  animeTitle,
 }: EpisodeListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [downloadingEp, setDownloadingEp] = useState<number | null>(null);
+
+  const handleDownloadEpisode = (e: React.MouseEvent, episode: Episode) => {
+    e.stopPropagation();
+
+    // Try to get a direct video URL from sources or embed_url
+    const directUrl = episode.sources?.[0]?.url || episode.embed_url;
+    if (!directUrl) return;
+
+    setDownloadingEp(episode.number);
+    downloadEpisode({
+      directUrl,
+      title: animeTitle,
+      episode: episode.number,
+    });
+    setTimeout(() => setDownloadingEp(null), 3000);
+  };
 
   return (
     <div className="space-y-4">
@@ -98,64 +118,96 @@ export function EpisodeList({
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 p-4">
             {episodes.map((episode, index) => (
-              <button
-                key={episode.id}
-                onClick={() => onEpisodeSelect(episode)}
-                style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
-                className={`episode-btn flex items-center justify-center h-10 rounded-lg text-sm font-medium animate-fade-in-up ${
-                  currentEpisode === episode.number
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-                    : 'bg-secondary hover:bg-primary/20 hover:text-primary text-foreground'
-                }`}
-              >
-                {episode.number}
-              </button>
+              <div key={episode.id} className="relative group">
+                <button
+                  onClick={() => onEpisodeSelect(episode)}
+                  style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
+                  className={`episode-btn flex items-center justify-center w-full h-10 rounded-lg text-sm font-medium animate-fade-in-up ${
+                    currentEpisode === episode.number
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                      : 'bg-secondary hover:bg-primary/20 hover:text-primary text-foreground'
+                  }`}
+                >
+                  {episode.number}
+                </button>
+                {(episode.sources?.[0]?.url || episode.embed_url) && (
+                  <button
+                    onClick={(e) => handleDownloadEpisode(e, episode)}
+                    className="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
+                    title="Скачать серию"
+                  >
+                    {downloadingEp === episode.number ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Download className="h-3 w-3" />
+                    )}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
           <div className="divide-y divide-border/50">
             {episodes.map((episode, index) => (
-              <button
+              <div
                 key={episode.id}
-                onClick={() => onEpisodeSelect(episode)}
-                style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
-                className={`flex items-center gap-3 w-full p-3 text-left transition-all duration-200 hover:bg-primary/10 hover:pl-5 animate-fade-in ${
+                className={`flex items-center gap-3 w-full p-3 transition-all duration-200 hover:bg-primary/10 animate-fade-in ${
                   currentEpisode === episode.number ? 'bg-primary/15 border-l-2 border-primary' : ''
                 }`}
+                style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
               >
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${
-                    currentEpisode === episode.number
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110'
-                      : 'bg-secondary text-foreground group-hover:bg-primary/20'
-                  }`}
+                <button
+                  onClick={() => onEpisodeSelect(episode)}
+                  className="flex items-center gap-3 flex-1 text-left hover:pl-2 transition-all duration-200"
                 >
-                  {currentEpisode === episode.number ? (
-                    <Play className="h-3 w-3 fill-current animate-pulse" />
-                  ) : (
-                    <span>{episode.number}</span>
-                  )}
-                </div>
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${
+                      currentEpisode === episode.number
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110'
+                        : 'bg-secondary text-foreground group-hover:bg-primary/20'
+                    }`}
+                  >
+                    {currentEpisode === episode.number ? (
+                      <Play className="h-3 w-3 fill-current animate-pulse" />
+                    ) : (
+                      <span>{episode.number}</span>
+                    )}
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium transition-colors duration-200 ${
-                    currentEpisode === episode.number ? 'text-primary' : 'text-foreground'
-                  }`}>
-                    Серия {episode.number}
-                  </p>
-                  {episode.name && episode.name !== `Серия ${episode.number}` && (
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {episode.name}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium transition-colors duration-200 ${
+                      currentEpisode === episode.number ? 'text-primary' : 'text-foreground'
+                    }`}>
+                      Серия {episode.number}
                     </p>
-                  )}
-                </div>
+                    {episode.name && episode.name !== `Серия ${episode.number}` && (
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {episode.name}
+                      </p>
+                    )}
+                  </div>
 
-                {episode.updated_at && (
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(episode.updated_at * 1000).toLocaleDateString('ru-RU')}
-                  </span>
+                  {episode.updated_at && (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(episode.updated_at * 1000).toLocaleDateString('ru-RU')}
+                    </span>
+                  )}
+                </button>
+
+                {(episode.sources?.[0]?.url || episode.embed_url) && (
+                  <button
+                    onClick={(e) => handleDownloadEpisode(e, episode)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                    title="Скачать серию"
+                  >
+                    {downloadingEp === episode.number ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         )}

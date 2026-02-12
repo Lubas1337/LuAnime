@@ -12,6 +12,7 @@ import {
   Loader2,
   ArrowLeft,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import { MovieGrid } from '@/components/movies/movie-grid';
 import { kinopoiskClient } from '@/lib/api/kinopoisk';
 import type { Movie, MoviePreview, MovieVideo } from '@/types/movie';
 import { getMoviePosterUrl, formatMovieDuration, getMovieTypeLabel } from '@/types/movie';
+import { downloadEpisode } from '@/lib/download';
 
 interface MoviePageProps {
   params: Promise<{ id: string }>;
@@ -294,6 +296,21 @@ export default function MoviePage({ params }: MoviePageProps) {
                   movieTitle={movie.nameRu}
                   isLoading={streamLoading}
                 />
+              </div>
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() =>
+                    downloadEpisode({
+                      kinopoiskId: movieId,
+                      title: movie.nameRu,
+                    })
+                  }
+                >
+                  <Download className="h-4 w-4" />
+                  Скачать фильм
+                </Button>
               </div>
             </TabsContent>
 

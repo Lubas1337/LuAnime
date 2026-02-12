@@ -311,6 +311,7 @@ export default function AnimePage({
                     currentTranslation={currentTranslation}
                     onEpisodeSelect={handleEpisodeSelect}
                     onTranslationSelect={handleTranslationSelect}
+                    animeTitle={anime.title_ru}
                   />
 
                   {currentEpisode && (

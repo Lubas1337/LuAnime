@@ -432,6 +432,9 @@ export default function SeriesPage({ params }: SeriesPageProps) {
                     onSeasonSelect={handleSeasonSelect}
                     onEpisodeSelect={handleEpisodeSelect}
                     onTranslationSelect={handleTranslationSelect}
+                    kinopoiskId={seriesId}
+                    audioIndex={selectedAudioIndex}
+                    seriesTitle={series.nameRu}
                   />
 
                   {currentEpisode && (

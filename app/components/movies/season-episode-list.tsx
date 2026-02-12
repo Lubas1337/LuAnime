@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, Grid, List, ChevronDown, Volume2 } from 'lucide-react';
+import { Play, Grid, List, ChevronDown, Volume2, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { downloadEpisode, downloadSeason } from '@/lib/download';
 import type { Season, Episode } from '@/types/movie';
 
 interface Translation {
@@ -27,6 +28,9 @@ interface SeasonEpisodeListProps {
   onSeasonSelect: (seasonNumber: number) => void;
   onEpisodeSelect: (episode: Episode) => void;
   onTranslationSelect: (translation: Translation) => void;
+  kinopoiskId: number;
+  audioIndex: number;
+  seriesTitle: string;
 }
 
 export function SeasonEpisodeList({
@@ -38,8 +42,14 @@ export function SeasonEpisodeList({
   onSeasonSelect,
   onEpisodeSelect,
   onTranslationSelect,
+  kinopoiskId,
+  audioIndex,
+  seriesTitle,
 }: SeasonEpisodeListProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [downloadingEp, setDownloadingEp] = useState<number | null>(null);
+  const [downloadingSeason, setDownloadingSeason] = useState(false);
+  const [seasonProgress, setSeasonProgress] = useState('');
 
   // Sort seasons by number
   const sortedSeasons = [...seasons].sort((a, b) => a.number - b.number);
@@ -50,6 +60,35 @@ export function SeasonEpisodeList({
     (a, b) => a.episodeNumber - b.episodeNumber
   );
 
+  const handleDownloadEpisode = (e: React.MouseEvent, episode: Episode) => {
+    e.stopPropagation();
+    setDownloadingEp(episode.episodeNumber);
+    downloadEpisode({
+      kinopoiskId,
+      season: currentSeason,
+      episode: episode.episodeNumber,
+      audio: audioIndex,
+      title: seriesTitle,
+    });
+    setTimeout(() => setDownloadingEp(null), 3000);
+  };
+
+  const handleDownloadSeason = async () => {
+    setDownloadingSeason(true);
+    await downloadSeason(
+      episodes,
+      {
+        kinopoiskId,
+        season: currentSeason,
+        audio: audioIndex,
+        title: seriesTitle,
+      },
+      (current, total) => setSeasonProgress(`${current}/${total}`),
+    );
+    setDownloadingSeason(false);
+    setSeasonProgress('');
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -58,6 +97,29 @@ export function SeasonEpisodeList({
         </h3>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Download season button */}
+          {episodes.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleDownloadSeason}
+              disabled={downloadingSeason}
+            >
+              {downloadingSeason ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {seasonProgress}
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Скачать сезон
+                </>
+              )}
+            </Button>
+          )}
+
           {/* Translation/Audio selector */}
           {translations.length > 0 && (
             <DropdownMenu>
@@ -145,65 +207,93 @@ export function SeasonEpisodeList({
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 p-4">
             {episodes.map((episode, index) => (
-              <button
-                key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-                onClick={() => onEpisodeSelect(episode)}
-                style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
-                className={`episode-btn flex items-center justify-center h-10 rounded-lg text-sm font-medium animate-fade-in-up ${
-                  currentEpisode === episode.episodeNumber
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-                    : 'bg-secondary hover:bg-primary/20 hover:text-primary text-foreground'
-                }`}
-              >
-                {episode.episodeNumber}
-              </button>
+              <div key={`${episode.seasonNumber}-${episode.episodeNumber}`} className="relative group">
+                <button
+                  onClick={() => onEpisodeSelect(episode)}
+                  style={{ animationDelay: `${Math.min(index * 20, 300)}ms` }}
+                  className={`episode-btn flex items-center justify-center w-full h-10 rounded-lg text-sm font-medium animate-fade-in-up ${
+                    currentEpisode === episode.episodeNumber
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                      : 'bg-secondary hover:bg-primary/20 hover:text-primary text-foreground'
+                  }`}
+                >
+                  {episode.episodeNumber}
+                </button>
+                <button
+                  onClick={(e) => handleDownloadEpisode(e, episode)}
+                  className="absolute -top-1 -right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
+                  title="Скачать серию"
+                >
+                  {downloadingEp === episode.episodeNumber ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="h-3 w-3" />
+                  )}
+                </button>
+              </div>
             ))}
           </div>
         ) : (
           <div className="divide-y divide-border/50">
             {episodes.map((episode, index) => (
-              <button
+              <div
                 key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-                onClick={() => onEpisodeSelect(episode)}
-                style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
-                className={`flex items-center gap-3 w-full p-3 text-left transition-all duration-200 hover:bg-primary/10 hover:pl-5 animate-fade-in ${
+                className={`flex items-center gap-3 w-full p-3 transition-all duration-200 hover:bg-primary/10 animate-fade-in ${
                   currentEpisode === episode.episodeNumber ? 'bg-primary/15 border-l-2 border-primary' : ''
                 }`}
+                style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
               >
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${
-                    currentEpisode === episode.episodeNumber
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110'
-                      : 'bg-secondary text-foreground'
-                  }`}
+                <button
+                  onClick={() => onEpisodeSelect(episode)}
+                  className="flex items-center gap-3 flex-1 text-left hover:pl-2 transition-all duration-200"
                 >
-                  {currentEpisode === episode.episodeNumber ? (
-                    <Play className="h-3 w-3 fill-current animate-pulse" />
-                  ) : (
-                    <span>{episode.episodeNumber}</span>
-                  )}
-                </div>
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${
+                      currentEpisode === episode.episodeNumber
+                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110'
+                        : 'bg-secondary text-foreground'
+                    }`}
+                  >
+                    {currentEpisode === episode.episodeNumber ? (
+                      <Play className="h-3 w-3 fill-current animate-pulse" />
+                    ) : (
+                      <span>{episode.episodeNumber}</span>
+                    )}
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium transition-colors duration-200 ${
-                    currentEpisode === episode.episodeNumber ? 'text-primary' : 'text-foreground'
-                  }`}>
-                    Серия {episode.episodeNumber}
-                    {episode.nameRu && ` — ${episode.nameRu}`}
-                  </p>
-                  {episode.synopsis && (
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {episode.synopsis}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium transition-colors duration-200 ${
+                      currentEpisode === episode.episodeNumber ? 'text-primary' : 'text-foreground'
+                    }`}>
+                      Серия {episode.episodeNumber}
+                      {episode.nameRu && ` — ${episode.nameRu}`}
                     </p>
-                  )}
-                </div>
+                    {episode.synopsis && (
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {episode.synopsis}
+                      </p>
+                    )}
+                  </div>
 
-                {episode.releaseDate && (
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(episode.releaseDate).toLocaleDateString('ru-RU')}
-                  </span>
-                )}
-              </button>
+                  {episode.releaseDate && (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(episode.releaseDate).toLocaleDateString('ru-RU')}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={(e) => handleDownloadEpisode(e, episode)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                  title="Скачать серию"
+                >
+                  {downloadingEp === episode.episodeNumber ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             ))}
           </div>
         )}
