@@ -228,19 +228,23 @@ export async function GET(request: NextRequest) {
   const filename = searchParams.get('filename') || 'video.ts';
 
   try {
+    console.log('[download] Starting HLS download for kp:', kp);
     const hlsUrl = await fetchCollapsHlsUrl(
       parseInt(kp),
       audio ? parseInt(audio) : undefined,
       season ? parseInt(season) : undefined,
       episode ? parseInt(episode) : undefined,
     );
+    console.log('[download] HLS URL:', hlsUrl ? 'found' : 'not found');
 
     if (!hlsUrl) {
       return NextResponse.json({ error: 'Could not resolve HLS URL' }, { status: 404 });
     }
 
     const variantUrl = await getBestVariantUrl(hlsUrl);
+    console.log('[download] Variant URL resolved');
     const segmentUrls = await getSegmentUrls(variantUrl);
+    console.log('[download] Segments:', segmentUrls.length);
 
     if (segmentUrls.length === 0) {
       return NextResponse.json({ error: 'No segments found' }, { status: 404 });
@@ -303,11 +307,10 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Disposition': contentDisposition(filename),
         'Content-Type': 'video/mp2t',
-        'Transfer-Encoding': 'chunked',
       },
     });
   } catch (error) {
-    console.error('HLS download error:', error);
+    console.log('[download] HLS download error:', error);
     return NextResponse.json({ error: 'Download failed' }, { status: 500 });
   }
 }
