@@ -1,4 +1,4 @@
-function buildFilename(title: string, season?: number, episode?: number, ext = 'ts'): string {
+function buildFilename(title: string, season?: number, episode?: number, ext = 'mp4'): string {
   const clean = title.replace(/[^\w\sа-яА-ЯёЁ-]/g, '').trim().replace(/\s+/g, '_');
   if (season !== undefined && episode !== undefined) {
     const s = String(season).padStart(2, '0');

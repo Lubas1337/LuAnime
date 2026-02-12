@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { spawn } from 'child_process';
+import { Readable } from 'stream';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -225,7 +227,7 @@ export async function GET(request: NextRequest) {
   const season = searchParams.get('season');
   const episode = searchParams.get('episode');
   const audio = searchParams.get('audio');
-  const filename = searchParams.get('filename') || 'video.ts';
+  const filename = searchParams.get('filename') || 'video.mp4';
 
   try {
 
@@ -248,63 +250,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No segments found' }, { status: 404 });
     }
 
-    // Stream segments with backpressure using pull-based approach
-    let segIdx = 0;
-    let currentReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    // Remux TS segments to MP4 via ffmpeg
+    const mp4Filename = filename.replace(/\.ts$/, '.mp4');
+    const ffmpeg = spawn('ffmpeg', [
+      '-i', 'pipe:0',
+      '-c', 'copy',
+      '-f', 'mp4',
+      '-movflags', 'frag_mp4+empty_moov',
+      'pipe:1',
+    ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    const stream = new ReadableStream({
-      async pull(controller) {
-        try {
-          while (true) {
-            // Read from current segment reader
-            if (currentReader) {
-              const { done, value } = await currentReader.read();
-              if (!done && value) {
-                controller.enqueue(value);
-                return; // wait for next pull
+    // Feed segments into ffmpeg stdin
+    (async () => {
+      try {
+        for (const segUrl of segmentUrls) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
+              const segRes = await fetch(segUrl, { headers: CDN_HEADERS });
+              if (!segRes.ok || !segRes.body) continue;
+              const reader = segRes.body.getReader();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const canWrite = ffmpeg.stdin.write(value);
+                if (!canWrite) await new Promise(r => ffmpeg.stdin.once('drain', r));
               }
-              currentReader = null;
-            }
-
-            // Move to next segment
-            if (segIdx >= segmentUrls.length) {
-              controller.close();
-              return;
-            }
-
-            const segUrl = segmentUrls[segIdx++];
-            let lastErr: unknown;
-            for (let attempt = 0; attempt < 3; attempt++) {
-              try {
-                if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
-                const segRes = await fetch(segUrl, { headers: CDN_HEADERS });
-                if (!segRes.ok || !segRes.body) {
-                  lastErr = new Error(`HTTP ${segRes.status}`);
-                  continue;
-                }
-                currentReader = segRes.body.getReader();
-                lastErr = null;
-                break;
-              } catch (err) {
-                lastErr = err;
-              }
-            }
-            if (lastErr) {
-              console.error(`Segment failed after retries: ${segUrl}`, lastErr);
-              // skip this segment, continue loop to try next
+              break;
+            } catch {
+              // retry
             }
           }
-        } catch (err) {
-          console.error('Segment streaming error:', err);
-          controller.error(err);
         }
-      },
-    });
+      } catch (err) {
+        console.error('Segment feed error:', err);
+      } finally {
+        ffmpeg.stdin.end();
+      }
+    })();
 
-    return new NextResponse(stream, {
+    // Convert ffmpeg stdout (Node stream) to web ReadableStream
+    const nodeStream = ffmpeg.stdout;
+    const webStream = Readable.toWeb(nodeStream) as ReadableStream;
+
+    ffmpeg.stderr.on('data', () => {}); // drain stderr to prevent blocking
+
+    return new NextResponse(webStream, {
       headers: {
-        'Content-Disposition': contentDisposition(filename),
-        'Content-Type': 'video/mp2t',
+        'Content-Disposition': contentDisposition(mp4Filename),
+        'Content-Type': 'video/mp4',
       },
     });
   } catch (error) {
