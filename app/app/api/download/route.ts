@@ -5,6 +5,12 @@ export const dynamic = 'force-dynamic';
 
 const COLLAPS_API = 'https://api.delivembd.ws/embed/kp/';
 
+function contentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, '_');
+  const encoded = encodeURIComponent(filename);
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 const CDN_HEADERS: Record<string, string> = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   'Referer': 'https://api.delivembd.ws/',
@@ -196,7 +202,7 @@ export async function GET(request: NextRequest) {
       }
 
       const headers: Record<string, string> = {
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': contentDisposition(filename),
         'Content-Type': response.headers.get('Content-Type') || 'video/mp4',
       };
 
@@ -268,7 +274,7 @@ export async function GET(request: NextRequest) {
 
     return new NextResponse(stream, {
       headers: {
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': contentDisposition(filename),
         'Content-Type': 'video/mp2t',
         'Transfer-Encoding': 'chunked',
       },
