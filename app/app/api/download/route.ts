@@ -246,23 +246,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No segments found' }, { status: 404 });
     }
 
-    // Stream segments sequentially
+    // Stream segments sequentially with retry
     const stream = new ReadableStream({
       async start(controller) {
         try {
           for (const segUrl of segmentUrls) {
-            const segRes = await fetch(segUrl, { headers: CDN_HEADERS });
-            if (!segRes.ok || !segRes.body) {
-              console.error(`Segment fetch failed: ${segRes.status} - ${segUrl}`);
-              continue;
+            let lastErr: unknown;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
+                const segRes = await fetch(segUrl, { headers: CDN_HEADERS });
+                if (!segRes.ok || !segRes.body) {
+                  lastErr = new Error(`HTTP ${segRes.status}`);
+                  continue;
+                }
+                const reader = segRes.body.getReader();
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  controller.enqueue(value);
+                }
+                lastErr = null;
+                break;
+              } catch (err) {
+                lastErr = err;
+              }
             }
-
-            const reader = segRes.body.getReader();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              controller.enqueue(value);
-            }
+            if (lastErr) console.error(`Segment failed after retries: ${segUrl}`, lastErr);
           }
           controller.close();
         } catch (err) {
