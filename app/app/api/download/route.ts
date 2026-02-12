@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
       '-i', 'pipe:0',
       '-c', 'copy',
       '-f', 'mp4',
-      '-movflags', 'frag_mp4+empty_moov',
+      '-movflags', 'frag_keyframe+empty_moov',
       'pipe:1',
     ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
