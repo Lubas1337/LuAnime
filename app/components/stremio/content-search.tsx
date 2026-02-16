@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { Search, Loader2, Film, Tv, Star } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { searchContent, getExternalIds } from '@/lib/api/stremio';
+import type { SearchSource } from '@/lib/api/stremio';
 import type { TMDBSearchResult } from '@/types/stremio';
 import { useRouter } from 'next/navigation';
 
@@ -12,10 +13,11 @@ export function ContentSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TMDBSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [resolving, setResolving] = useState<number | null>(null);
+  const [resolving, setResolving] = useState<number | string | null>(null);
+  const [source, setSource] = useState<SearchSource>('cinemeta');
   const debounceRef = useRef<NodeJS.Timeout>(undefined);
 
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearch = useCallback(async (q: string, src: SearchSource) => {
     if (!q.trim()) {
       setResults([]);
       return;
@@ -23,7 +25,7 @@ export function ContentSearch() {
 
     setLoading(true);
     try {
-      const data = await searchContent(q);
+      const data = await searchContent(q, src);
       setResults(data);
     } catch {
       setResults([]);
@@ -35,14 +37,33 @@ export function ContentSearch() {
   const handleInputChange = (value: string) => {
     setQuery(value);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => handleSearch(value), 500);
+    debounceRef.current = setTimeout(() => handleSearch(value, source), 500);
+  };
+
+  const handleSourceChange = (newSource: SearchSource) => {
+    setSource(newSource);
+    if (query.trim()) {
+      handleSearch(query, newSource);
+    }
   };
 
   const handleSelect = async (item: TMDBSearchResult) => {
     setResolving(item.id);
     try {
-      const ids = await getExternalIds(item.id, item.mediaType);
-      if (!ids.imdbId) {
+      let imdbId: string | null = null;
+
+      // Cinemeta results already have IMDB ID as the `id` field
+      if (item.imdbId) {
+        imdbId = item.imdbId;
+      } else if (source === 'cinemeta' && typeof item.id === 'string' && (item.id as string).startsWith('tt')) {
+        imdbId = item.id as unknown as string;
+      } else {
+        // TMDB — need to fetch external IDs
+        const ids = await getExternalIds(item.id as number, item.mediaType);
+        imdbId = ids.imdbId;
+      }
+
+      if (!imdbId) {
         alert('IMDB ID не найден для этого контента');
         setResolving(null);
         return;
@@ -50,16 +71,15 @@ export function ContentSearch() {
 
       const type = item.mediaType === 'movie' ? 'movie' : 'series';
       const params = new URLSearchParams({
-        imdb: ids.imdbId,
+        imdb: imdbId,
         type,
         title: item.title,
-        tmdb: item.id.toString(),
       });
       if (item.posterPath) params.set('poster', item.posterPath);
 
       router.push(`/stremio/watch?${params}`);
     } catch {
-      alert('Ошибка получения IMDB ID');
+      alert('Ошибка получения данных');
     } finally {
       setResolving(null);
     }
@@ -67,17 +87,41 @@ export function ContentSearch() {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          placeholder="Поиск фильмов и сериалов..."
-          className="pl-10"
-        />
-        {loading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-        )}
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => handleInputChange(e.target.value)}
+            placeholder="Поиск фильмов и сериалов..."
+            className="pl-10"
+          />
+          {loading && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
+          <button
+            onClick={() => handleSourceChange('cinemeta')}
+            className={`px-3 py-2 text-xs font-medium transition-colors ${
+              source === 'cinemeta'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            }`}
+          >
+            Cinemeta
+          </button>
+          <button
+            onClick={() => handleSourceChange('tmdb')}
+            className={`px-3 py-2 text-xs font-medium transition-colors ${
+              source === 'tmdb'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            }`}
+          >
+            TMDB
+          </button>
+        </div>
       </div>
 
       {results.length > 0 && (

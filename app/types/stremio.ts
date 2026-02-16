@@ -66,7 +66,7 @@ export interface StreamSource {
 }
 
 export interface TMDBSearchResult {
-  id: number;
+  id: number | string;
   title: string;
   originalTitle?: string;
   overview?: string;

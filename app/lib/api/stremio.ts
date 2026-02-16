@@ -29,11 +29,14 @@ export async function fetchStreams(
   return data.streams || [];
 }
 
+export type SearchSource = 'cinemeta' | 'tmdb';
+
 export async function searchContent(
   query: string,
+  source: SearchSource = 'cinemeta',
   type?: string
 ): Promise<TMDBSearchResult[]> {
-  const params = new URLSearchParams({ query });
+  const params = new URLSearchParams({ query, source });
   if (type) params.set('type', type);
   const res = await fetch(`/api/stremio/search?${params}`);
   if (!res.ok) return [];
