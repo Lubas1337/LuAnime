@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'add') {
-      const res = await fetch(`${baseUrl}/torrents`, {
+      // Step 1: Add torrent
+      const addRes = await fetch(`${baseUrl}/torrents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -67,17 +68,39 @@ export async function POST(req: NextRequest) {
         signal: AbortSignal.timeout(30000),
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`TorrServer error: ${res.status} ${text}`);
+      if (!addRes.ok) {
+        const text = await addRes.text().catch(() => '');
+        throw new Error(`TorrServer error: ${addRes.status} ${text}`);
       }
 
-      const torrent = await res.json();
+      const addResult = await addRes.json();
+      const torrentHash = addResult.hash;
 
+      // Step 2: Poll for file_stats (metadata takes time to load)
       const videoExts = /\.(mp4|mkv|avi|mov|wmv|flv|webm|m4v|ts)$/i;
-      const files = (torrent.file_stats || [])
-        .filter((f: any) => videoExts.test(f.path))
-        .sort((a: any, b: any) => (b.length || 0) - (a.length || 0));
+      let files: any[] = [];
+      const maxAttempts = 15;
+
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, i === 0 ? 500 : 1500));
+
+        const getRes = await fetch(`${baseUrl}/torrents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get', hash: torrentHash }),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (!getRes.ok) continue;
+
+        const torrent = await getRes.json();
+        const fileStats = torrent.file_stats || [];
+        files = fileStats
+          .filter((f: any) => videoExts.test(f.path))
+          .sort((a: any, b: any) => (b.length || 0) - (a.length || 0));
+
+        if (files.length > 0) break;
+      }
 
       const mainFile = files[0];
       if (!mainFile) {
@@ -87,10 +110,10 @@ export async function POST(req: NextRequest) {
       const publicBase = getPublicStreamBase(serverUrl);
       const proxyBase = '/api/stremio/torrserver';
 
-      const streamUrl = buildStreamUrl(publicBase, proxyBase, torrent.hash, mainFile.id, mainFile.path);
+      const streamUrl = buildStreamUrl(publicBase, proxyBase, torrentHash, mainFile.id, mainFile.path);
 
       return NextResponse.json({
-        hash: torrent.hash,
+        hash: torrentHash,
         streamUrl,
         fileName: mainFile.path,
         fileSize: mainFile.length,
@@ -98,7 +121,7 @@ export async function POST(req: NextRequest) {
           id: f.id,
           path: f.path,
           size: f.length,
-          streamUrl: buildStreamUrl(publicBase, proxyBase, torrent.hash, f.id, f.path),
+          streamUrl: buildStreamUrl(publicBase, proxyBase, torrentHash, f.id, f.path),
         })),
       });
     }
