@@ -9,13 +9,13 @@ function resolveServerUrl(clientUrl: string): string {
 }
 
 // Public URL for direct browser access (bypasses Next.js proxy)
+// Set TORRSERVER_DIRECT=1 to use public URL (requires DNS-only in Cloudflare)
 function getPublicStreamBase(clientUrl: string): string | null {
-  // For built-in: use the public TorrServer domain
   if (clientUrl === 'built-in') {
+    if (process.env.TORRSERVER_DIRECT !== '1') return null; // use proxy
     const publicUrl = process.env.TORRSERVER_PUBLIC_URL;
     return publicUrl ? publicUrl.replace(/\/+$/, '') : null;
   }
-  // For custom URL: browser can reach it directly
   return clientUrl.replace(/\/+$/, '');
 }
 
