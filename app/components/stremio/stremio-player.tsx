@@ -26,6 +26,74 @@ import type { StreamSource } from '@/types/stremio';
 
 const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
+const WEBTOR_SDK_URL = 'https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js';
+
+function WebtorPlayer({
+  infoHash,
+  fileName,
+  poster,
+}: {
+  infoHash: string;
+  fileName?: string;
+  poster?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const idRef = useRef(`webtor-${infoHash.slice(0, 8)}-${Date.now()}`);
+
+  useEffect(() => {
+    const id = idRef.current;
+
+    const w = window as any;
+    w.webtor = w.webtor || [];
+    w.webtor.push({
+      id,
+      magnet: `magnet:?xt=urn:btih:${infoHash}`,
+      poster: poster || undefined,
+      path: fileName || undefined,
+      on: (e: { name: string }) => {
+        if (e.name === 'error') {
+          console.error('Webtor error', e);
+        }
+      },
+      features: {
+        autoplay: true,
+        settings: true,
+        fullscreen: true,
+        subtitles: true,
+        p2pProgress: false,
+      },
+      width: '100%',
+      height: '100%',
+    });
+
+    // Load SDK script if not yet loaded
+    if (!document.querySelector(`script[src="${WEBTOR_SDK_URL}"]`)) {
+      const script = document.createElement('script');
+      script.src = WEBTOR_SDK_URL;
+      script.async = true;
+      document.head.appendChild(script);
+    } else {
+      // SDK already loaded — re-trigger processing
+      w.webtor?.init?.();
+    }
+
+    return () => {
+      // Cleanup: clear the container
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '';
+    };
+  }, [infoHash, fileName, poster]);
+
+  return (
+    <div className="video-player-container relative">
+      <div
+        id={idRef.current}
+        className="webtor w-full h-full"
+      />
+    </div>
+  );
+}
+
 interface StremioPlayerProps {
   source: StreamSource | null;
   poster?: string;
@@ -246,21 +314,14 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
     );
   }
 
-  // Torrent stream — use Webtor.io iframe player
+  // Torrent stream — use Webtor.io Embed SDK
   if (source.isTorrent && source.infoHash) {
-    const magnetUri = `magnet:?xt=urn:btih:${source.infoHash}`;
-    const webtorUrl = `https://webtor.io/show?magnet=${encodeURIComponent(magnetUri)}${source.filename ? `&file=${encodeURIComponent(source.filename)}` : ''}`;
-
     return (
-      <div className="video-player-container relative">
-        <iframe
-          src={webtorUrl}
-          className="w-full h-full border-0"
-          allowFullScreen
-          allow="autoplay; fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-        />
-      </div>
+      <WebtorPlayer
+        infoHash={source.infoHash}
+        fileName={source.filename}
+        poster={poster}
+      />
     );
   }
 
