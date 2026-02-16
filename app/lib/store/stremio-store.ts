@@ -6,10 +6,12 @@ import type { StremioAddon, StremioManifest } from '@/types/stremio';
 
 interface StremioState {
   addons: StremioAddon[];
+  torrServerUrl: string;
   addAddon: (url: string, manifest: StremioManifest) => void;
   removeAddon: (id: string) => void;
   toggleAddon: (id: string) => void;
   getEnabledAddons: () => StremioAddon[];
+  setTorrServerUrl: (url: string) => void;
 }
 
 function normalizeUrl(url: string): string {
@@ -20,6 +22,7 @@ export const useStremioStore = create<StremioState>()(
   persist(
     (set, get) => ({
       addons: [],
+      torrServerUrl: '',
 
       addAddon: (url, manifest) => {
         const transportUrl = normalizeUrl(url);
@@ -55,6 +58,8 @@ export const useStremioStore = create<StremioState>()(
         })),
 
       getEnabledAddons: () => get().addons.filter((a) => a.isEnabled),
+
+      setTorrServerUrl: (url) => set({ torrServerUrl: url.replace(/\/+$/, '') }),
     }),
     {
       name: 'stremio-addons-storage',

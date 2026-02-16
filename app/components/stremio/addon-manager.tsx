@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Power, Loader2, ExternalLink, Download } from 'lucide-react';
+import { Plus, Trash2, Power, Loader2, ExternalLink, Download, Server, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useStremioStore } from '@/lib/store/stremio-store';
-import { fetchManifest } from '@/lib/api/stremio';
+import { fetchManifest, checkTorrServer } from '@/lib/api/stremio';
 
 interface PresetAddon {
   name: string;
@@ -18,7 +18,7 @@ const PRESET_ADDONS: PresetAddon[] = [
   {
     name: 'Torrentio',
     url: 'https://torrentio.strem.fun',
-    description: 'Торренты из множества трекеров. Без Debrid — magnet-ссылки, с Debrid — прямое воспроизведение.',
+    description: 'Настройте на torrentio.strem.fun с Real-Debrid для прямого воспроизведения в браузере.',
     tag: 'Популярный',
   },
   {
@@ -53,11 +53,35 @@ const PRESET_ADDONS: PresetAddon[] = [
 ];
 
 export function AddonManager() {
-  const { addons, addAddon, removeAddon, toggleAddon } = useStremioStore();
+  const { addons, addAddon, removeAddon, toggleAddon, torrServerUrl, setTorrServerUrl } = useStremioStore();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [tsUrl, setTsUrl] = useState(torrServerUrl);
+  const [tsChecking, setTsChecking] = useState(false);
+  const [tsStatus, setTsStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+
+  const handleTorrServerSave = async () => {
+    const trimmed = tsUrl.trim();
+    if (!trimmed) {
+      setTorrServerUrl('');
+      setTsStatus('idle');
+      return;
+    }
+
+    setTsChecking(true);
+    setTsStatus('idle');
+    const result = await checkTorrServer(trimmed);
+    setTsChecking(false);
+
+    if (result.ok) {
+      setTorrServerUrl(trimmed);
+      setTsStatus('ok');
+    } else {
+      setTsStatus('error');
+    }
+  };
 
   const handleAdd = async (addonUrl?: string) => {
     const targetUrl = addonUrl || url.trim();
@@ -90,6 +114,79 @@ export function AddonManager() {
 
   return (
     <div className="space-y-4 overflow-hidden">
+      {/* TorrServer settings */}
+      <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Server className="h-4 w-4 text-muted-foreground" />
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            TorrServer
+          </p>
+          {torrServerUrl && tsStatus !== 'error' && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 font-medium">
+              Подключён
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Для воспроизведения торрентов в плеере. Запустите через Docker или скачайте бинарник.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={tsUrl === 'built-in' ? '' : tsUrl}
+            onChange={(e) => { setTsUrl(e.target.value); setTsStatus('idle'); }}
+            placeholder="http://localhost:8090"
+            className="flex-1 min-w-0 text-sm"
+            onKeyDown={(e) => e.key === 'Enter' && handleTorrServerSave()}
+            disabled={tsUrl === 'built-in' && tsStatus === 'ok'}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleTorrServerSave}
+            disabled={tsChecking}
+            className="shrink-0"
+          >
+            {tsChecking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : tsStatus === 'ok' ? (
+              <Check className="h-4 w-4 text-green-400" />
+            ) : tsStatus === 'error' ? (
+              <X className="h-4 w-4 text-red-400" />
+            ) : (
+              'Сохранить'
+            )}
+          </Button>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-xs w-full"
+          disabled={tsChecking}
+          onClick={async () => {
+            setTsUrl('built-in');
+            setTsChecking(true);
+            setTsStatus('idle');
+            const result = await checkTorrServer('built-in');
+            setTsChecking(false);
+            if (result.ok) {
+              setTorrServerUrl('built-in');
+              setTsStatus('ok');
+            } else {
+              setTsStatus('error');
+            }
+          }}
+        >
+          <Server className="h-3 w-3 mr-1" />
+          Использовать встроенный сервер
+        </Button>
+        {tsStatus === 'error' && tsUrl !== 'built-in' && (
+          <p className="text-xs text-red-400">Не удалось подключиться. Проверьте URL и что TorrServer запущен.</p>
+        )}
+        {tsStatus === 'error' && tsUrl === 'built-in' && (
+          <p className="text-xs text-red-400">Встроенный TorrServer недоступен. Укажите URL вручную.</p>
+        )}
+      </div>
+
       {/* Manual URL input */}
       <div className="flex gap-2">
         <Input

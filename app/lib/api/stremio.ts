@@ -180,6 +180,58 @@ export async function resolveAllStreams(
   return sortSources(allSources);
 }
 
+// TorrServer: resolve magnet to direct HTTP stream URL
+export async function resolveTorrentStream(
+  serverUrl: string,
+  magnetOrHash: string,
+  title?: string,
+  poster?: string
+): Promise<{ streamUrl: string; hash: string; fileName: string; files: { id: number; path: string; size: number; streamUrl: string }[] }> {
+  const res = await fetch('/api/stremio/torrserver', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      serverUrl,
+      action: 'add',
+      magnet: magnetOrHash,
+      title,
+      poster,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to resolve torrent');
+  }
+
+  return res.json();
+}
+
+// TorrServer: health check
+// Pass serverUrl = 'built-in' to check the server-side env configured TorrServer
+export async function checkTorrServer(serverUrl: string): Promise<{ ok: boolean; version?: string }> {
+  try {
+    const res = await fetch('/api/stremio/torrserver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serverUrl, action: 'echo' }),
+    });
+    if (!res.ok) return { ok: false };
+    return res.json();
+  } catch {
+    return { ok: false };
+  }
+}
+
+// TorrServer: drop torrent from memory
+export async function dropTorrent(serverUrl: string, hash: string): Promise<void> {
+  fetch('/api/stremio/torrserver', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serverUrl, action: 'drop', hash }),
+  }).catch(() => {});
+}
+
 // Build Stremio stream ID for series
 export function buildSeriesId(
   imdbId: string,

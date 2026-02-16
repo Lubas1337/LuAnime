@@ -28,6 +28,8 @@ spec:
               value: "0.0.0.0"
             - name: TORRSERVER_INTERNAL_URL
               value: "http://torrserver:8090"
+            - name: TORRSERVER_PUBLIC_URL
+              value: "https://ts.lubax.net"
           resources:
             requests:
               memory: "64Mi"

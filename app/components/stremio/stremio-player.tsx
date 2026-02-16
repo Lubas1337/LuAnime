@@ -13,6 +13,12 @@ import {
   SkipBack,
   Loader2,
   Settings,
+  Magnet,
+  Copy,
+  Check,
+  HardDrive,
+  Info,
+  Server,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,74 +28,153 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useStremioStore } from '@/lib/store/stremio-store';
+import { resolveTorrentStream, dropTorrent } from '@/lib/api/stremio';
 import type { StreamSource } from '@/types/stremio';
 
 const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-const WEBTOR_SDK_URL = 'https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js';
-
-function WebtorPlayer({
-  infoHash,
-  fileName,
+function TorrentPanel({
+  source,
   poster,
+  title,
+  onResolved,
 }: {
-  infoHash: string;
-  fileName?: string;
+  source: StreamSource;
   poster?: string;
+  title?: string;
+  onResolved: (url: string) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const idRef = useRef(`webtor-${infoHash.slice(0, 8)}-${Date.now()}`);
+  const { torrServerUrl } = useStremioStore();
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const magnetUrl = source.url;
 
+  // Auto-resolve if TorrServer is configured
   useEffect(() => {
-    const id = idRef.current;
-
-    const w = window as any;
-    w.webtor = w.webtor || [];
-    w.webtor.push({
-      id,
-      magnet: `magnet:?xt=urn:btih:${infoHash}`,
-      poster: poster || undefined,
-      path: fileName || undefined,
-      on: (e: { name: string }) => {
-        if (e.name === 'error') {
-          console.error('Webtor error', e);
-        }
-      },
-      features: {
-        autoplay: true,
-        settings: true,
-        fullscreen: true,
-        subtitles: true,
-        p2pProgress: false,
-      },
-      width: '100%',
-      height: '100%',
-    });
-
-    // Load SDK script if not yet loaded
-    if (!document.querySelector(`script[src="${WEBTOR_SDK_URL}"]`)) {
-      const script = document.createElement('script');
-      script.src = WEBTOR_SDK_URL;
-      script.async = true;
-      document.head.appendChild(script);
-    } else {
-      // SDK already loaded — re-trigger processing
-      w.webtor?.init?.();
+    if (torrServerUrl && source.infoHash) {
+      handleResolve();
     }
+  }, [source.infoHash, torrServerUrl]);
 
-    return () => {
-      // Cleanup: clear the container
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = '';
-    };
-  }, [infoHash, fileName, poster]);
+  const handleResolve = async () => {
+    if (!torrServerUrl) return;
+    setResolving(true);
+    setError('');
+
+    try {
+      const result = await resolveTorrentStream(
+        torrServerUrl,
+        magnetUrl,
+        title,
+        poster
+      );
+      onResolved(result.streamUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось подключиться к TorrServer');
+      setResolving(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(magnetUrl);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = magnetUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <div className="video-player-container relative">
+    <div className="video-player-container relative flex flex-col items-center justify-center bg-card">
       <div
-        id={idRef.current}
-        className="webtor w-full h-full"
+        className="absolute inset-0 bg-cover bg-center opacity-10"
+        style={{ backgroundImage: poster ? `url(${poster})` : undefined }}
       />
+      <div className="relative z-10 text-center space-y-4 p-6 max-w-md">
+        {resolving ? (
+          <>
+            <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+            <div>
+              <p className="text-foreground font-semibold">Загрузка через TorrServer...</p>
+              <p className="text-sm text-muted-foreground mt-1">Подготовка стрима</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <Magnet className="h-12 w-12 mx-auto text-amber-400" />
+            <div>
+              <p className="text-foreground font-semibold text-lg">Торрент-стрим</p>
+              {!torrServerUrl && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Для воспроизведения настройте TorrServer или Debrid
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Stream info */}
+        <div className="space-y-2 text-left bg-background/50 rounded-lg p-3 border border-border">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Аддон:</span>
+            <span className="font-medium">{source.addonName}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Качество:</span>
+            <span className="font-medium">{source.quality}</span>
+          </div>
+          {source.size && (
+            <div className="flex items-center gap-2 text-sm">
+              <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">{source.size}</span>
+            </div>
+          )}
+          {source.title && (
+            <p className="text-xs text-muted-foreground break-all line-clamp-2 pt-1 border-t border-border">
+              {source.title}
+            </p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-2">
+          {torrServerUrl && !resolving && (
+            <Button onClick={handleResolve} className="gap-2">
+              <Server className="h-4 w-4" />
+              Воспроизвести через TorrServer
+            </Button>
+          )}
+          <Button onClick={handleCopy} variant="outline" className="gap-2">
+            {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+            {copied ? 'Скопировано!' : 'Копировать magnet-ссылку'}
+          </Button>
+        </div>
+
+        {/* Hints */}
+        {!torrServerUrl && (
+          <div className="flex items-start gap-2 text-left bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+            <div className="text-xs text-blue-200/80 space-y-1">
+              <p><strong>TorrServer</strong> — запустите локально или на VPS, укажите URL в настройках аддонов. Торренты будут воспроизводиться в плеере.</p>
+              <p><strong>Debrid</strong> — настройте Torrentio с Real-Debrid, и торренты станут прямыми ссылками.</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -116,6 +201,12 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
   const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(1);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [resolvedTorrentUrl, setResolvedTorrentUrl] = useState<string | null>(null);
+
+  // Reset resolved URL when source changes
+  useEffect(() => {
+    setResolvedTorrentUrl(null);
+  }, [source?.url]);
 
   const isPlayingRef = useRef(false);
   isPlayingRef.current = isPlaying;
@@ -159,9 +250,10 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
   }, [onError]);
 
   useEffect(() => {
-    if (source?.url) {
+    const url = resolvedTorrentUrl || (source && !source.isTorrent ? source.url : null);
+    if (url) {
       setIsLoading(true);
-      initVideo(source.url);
+      initVideo(url);
     }
 
     return () => {
@@ -170,7 +262,7 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
         hlsRef.current = null;
       }
     };
-  }, [source?.url, initVideo]);
+  }, [source?.url, resolvedTorrentUrl, initVideo]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -314,13 +406,14 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
     );
   }
 
-  // Torrent stream — use Webtor.io Embed SDK
-  if (source.isTorrent && source.infoHash) {
+  // Torrent stream — resolve via TorrServer or show info panel
+  if (source.isTorrent && !resolvedTorrentUrl) {
     return (
-      <WebtorPlayer
-        infoHash={source.infoHash}
-        fileName={source.filename}
+      <TorrentPanel
+        source={source}
         poster={poster}
+        title={title}
+        onResolved={setResolvedTorrentUrl}
       />
     );
   }

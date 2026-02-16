@@ -72,3 +72,57 @@ spec:
     - port: 8090
       targetPort: 8090
       protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: torrserver
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: default-torrserver-cors@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ts.lubax.net
+      secretName: torrserver-tls
+  rules:
+    - host: ts.lubax.net
+      http:
+        paths:
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: torrserver
+                port:
+                  number: 8090
+          - path: /echo
+            pathType: Prefix
+            backend:
+              service:
+                name: torrserver
+                port:
+                  number: 8090
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: torrserver-cors
+  namespace: default
+spec:
+  headers:
+    accessControlAllowMethods:
+      - GET
+      - HEAD
+      - OPTIONS
+    accessControlAllowHeaders:
+      - Range
+    accessControlExposeHeaders:
+      - Content-Range
+      - Content-Length
+      - Accept-Ranges
+    accessControlAllowOriginListRegex:
+      - "https://(watch|anime)\\.lubax\\.net"
+    accessControlMaxAge: 86400
