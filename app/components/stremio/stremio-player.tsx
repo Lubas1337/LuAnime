@@ -246,6 +246,24 @@ export function StremioPlayer({ source, poster, title, onError }: StremioPlayerP
     );
   }
 
+  // Torrent stream — use Webtor.io iframe player
+  if (source.isTorrent && source.infoHash) {
+    const magnetUri = `magnet:?xt=urn:btih:${source.infoHash}`;
+    const webtorUrl = `https://webtor.io/show?magnet=${encodeURIComponent(magnetUri)}${source.filename ? `&file=${encodeURIComponent(source.filename)}` : ''}`;
+
+    return (
+      <div className="video-player-container relative">
+        <iframe
+          src={webtorUrl}
+          className="w-full h-full border-0"
+          allowFullScreen
+          allow="autoplay; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}

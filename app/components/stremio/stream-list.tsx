@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, ArrowUpDown, HardDrive, Wifi, Loader2, Magnet, ExternalLink } from 'lucide-react';
+import { Play, ArrowUpDown, HardDrive, Wifi, Loader2, Magnet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { sortSources } from '@/lib/api/stremio';
@@ -21,6 +21,70 @@ interface StreamListProps {
   loadingAddons?: string[];
   onSelect: (source: StreamSource) => void;
   selectedUrl?: string;
+}
+
+function StreamItem({
+  source,
+  isSelected,
+  onSelect,
+}: {
+  source: StreamSource;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const isTorrent = source.isTorrent;
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full text-left p-3 rounded-lg border transition-all hover:border-primary/50 ${
+        isSelected
+          ? 'border-primary bg-primary/10'
+          : isTorrent
+            ? 'border-border bg-card/50 hover:bg-card/80 hover:border-amber-500/30'
+            : 'border-border bg-card hover:bg-card/80'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5">
+          {isTorrent ? (
+            <Magnet className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-amber-400/70'}`} />
+          ) : (
+            <Play className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge
+              variant="outline"
+              className={qualityColors[source.quality] || 'bg-secondary text-secondary-foreground'}
+            >
+              {source.quality}
+            </Badge>
+            {isTorrent && (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-300/80 border-amber-500/20">
+                Торрент
+              </Badge>
+            )}
+            {source.size && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <HardDrive className="h-3 w-3" />
+                {source.size}
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {source.addonName}
+            </span>
+          </div>
+          {source.title && (
+            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 break-all">
+              {source.title}
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export function StreamList({
@@ -82,108 +146,31 @@ export function StreamList({
       </div>
 
       <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-        {/* Direct (playable) streams */}
         {directStreams.map((source, i) => (
-          <button
+          <StreamItem
             key={`direct-${source.addonId}-${i}`}
-            onClick={() => onSelect(source)}
-            className={`w-full text-left p-3 rounded-lg border transition-all hover:border-primary/50 ${
-              selectedUrl === source.url
-                ? 'border-primary bg-primary/10'
-                : 'border-border bg-card hover:bg-card/80'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5">
-                <Play className={`h-4 w-4 ${selectedUrl === source.url ? 'text-primary' : 'text-muted-foreground'}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant="outline"
-                    className={qualityColors[source.quality] || 'bg-secondary text-secondary-foreground'}
-                  >
-                    {source.quality}
-                  </Badge>
-                  {source.size && (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <HardDrive className="h-3 w-3" />
-                      {source.size}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    {source.addonName}
-                  </span>
-                </div>
-                {source.title && (
-                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 break-all">
-                    {source.title}
-                  </p>
-                )}
-              </div>
-            </div>
-          </button>
+            source={source}
+            isSelected={selectedUrl === source.url}
+            onSelect={() => onSelect(source)}
+          />
         ))}
 
-        {/* Torrent streams */}
-        {torrentStreams.length > 0 && (
-          <>
-            {directStreams.length > 0 && (
-              <div className="flex items-center gap-2 pt-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Торренты</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-            )}
-            {directStreams.length === 0 && (
-              <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300/80">
-                <Magnet className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
-                Нет прямых стримов. Для воспроизведения торрентов настройте Debrid-сервис (Real-Debrid, AllDebrid) в аддоне.
-              </div>
-            )}
-            {torrentStreams.map((source, i) => (
-              <a
-                key={`torrent-${source.addonId}-${i}`}
-                href={source.url}
-                className="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-card/80 hover:border-amber-500/30 transition-all block"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <Magnet className="h-4 w-4 text-amber-400/70" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className={qualityColors[source.quality] || 'bg-secondary text-secondary-foreground'}
-                      >
-                        {source.quality}
-                      </Badge>
-                      <Badge variant="outline" className="bg-amber-500/10 text-amber-300/80 border-amber-500/20">
-                        Торрент
-                      </Badge>
-                      {source.size && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <HardDrive className="h-3 w-3" />
-                          {source.size}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {source.addonName}
-                      </span>
-                    </div>
-                    {source.title && (
-                      <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 break-all">
-                        {source.title}
-                      </p>
-                    )}
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-                </div>
-              </a>
-            ))}
-          </>
+        {torrentStreams.length > 0 && directStreams.length > 0 && (
+          <div className="flex items-center gap-2 pt-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Торренты</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
         )}
+
+        {torrentStreams.map((source, i) => (
+          <StreamItem
+            key={`torrent-${source.addonId}-${i}`}
+            source={source}
+            isSelected={selectedUrl === source.url}
+            onSelect={() => onSelect(source)}
+          />
+        ))}
       </div>
     </div>
   );
