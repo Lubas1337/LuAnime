@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 function resolveServerUrl(clientUrl: string): string {
   if (clientUrl === 'built-in') {
-    const internalUrl = process.env.TORRSERVER_INTERNAL_URL;
-    if (!internalUrl) throw new Error('TORRSERVER_INTERNAL_URL not configured');
+    const internalUrl = process.env.TORRSERVER_INTERNAL_URL || 'http://localhost:8090';
     return internalUrl.replace(/\/+$/, '');
   }
   return clientUrl.replace(/\/+$/, '');
