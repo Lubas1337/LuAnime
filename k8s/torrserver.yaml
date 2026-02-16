@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: torrserver
+  namespace: default
+  labels:
+    app: torrserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: torrserver
+  template:
+    metadata:
+      labels:
+        app: torrserver
+    spec:
+      containers:
+        - name: torrserver
+          image: ghcr.io/yourok/torrserver:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8090
+          volumeMounts:
+            - name: torrserver-data
+              mountPath: /opt/ts
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /echo
+              port: 8090
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /echo
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 30
+      volumes:
+        - name: torrserver-data
+          persistentVolumeClaim:
+            claimName: torrserver-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: torrserver-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: torrserver
+  namespace: default
+spec:
+  selector:
+    app: torrserver
+  ports:
+    - port: 8090
+      targetPort: 8090
+      protocol: TCP

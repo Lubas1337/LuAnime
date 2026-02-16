@@ -26,6 +26,8 @@ spec:
               value: "production"
             - name: HOSTNAME
               value: "0.0.0.0"
+            - name: TORRSERVER_INTERNAL_URL
+              value: "http://torrserver:8090"
           resources:
             requests:
               memory: "64Mi"
