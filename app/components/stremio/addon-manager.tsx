@@ -45,9 +45,10 @@ const PRESET_ADDONS: PresetAddon[] = [
     tag: 'Субтитры',
   },
   {
-    name: 'Cyberflix',
-    url: 'https://cyberflix.elfhosted.com',
-    description: 'Каталог с информацией о фильмах и сериалах.',
+    name: 'Cinemeta',
+    url: 'https://v3-cinemeta.strem.io',
+    description: 'Официальный каталог Stremio с метаданными фильмов и сериалов.',
+    tag: 'Каталог',
   },
 ];
 
@@ -88,14 +89,14 @@ export function AddonManager() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       {/* Manual URL input */}
       <div className="flex gap-2">
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="URL аддона (например, https://torrentio.strem.fun)"
-          className="flex-1"
+          placeholder="URL аддона"
+          className="flex-1 min-w-0"
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           disabled={loading}
         />
@@ -123,9 +124,9 @@ export function AddonManager() {
             {availablePresets.map((preset) => (
               <div
                 key={preset.url}
-                className="flex items-center gap-3 p-2.5 rounded-lg border border-dashed border-border hover:border-primary/40 transition-colors"
+                className="flex items-center gap-3 p-2.5 rounded-lg border border-dashed border-border hover:border-primary/40 transition-colors overflow-hidden"
               >
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{preset.name}</p>
                     {preset.tag && (
@@ -165,7 +166,7 @@ export function AddonManager() {
             {addons.map((addon) => (
               <div
                 key={addon.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                className={`flex items-center gap-3 p-3 rounded-lg border overflow-hidden transition-colors ${
                   addon.isEnabled
                     ? 'border-border bg-card'
                     : 'border-border/50 bg-card/50 opacity-60'
@@ -175,16 +176,16 @@ export function AddonManager() {
                   <img
                     src={addon.logo}
                     alt=""
-                    className="h-8 w-8 rounded object-contain"
+                    className="h-8 w-8 rounded object-contain shrink-0"
                   />
                 )}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <p className="font-medium text-sm truncate">{addon.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {addon.description || addon.transportUrl}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <a
                     href={addon.transportUrl}
                     target="_blank"

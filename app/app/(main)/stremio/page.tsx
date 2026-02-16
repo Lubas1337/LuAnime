@@ -39,11 +39,13 @@ export default function StremioPage() {
               )}
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Управление аддонами</DialogTitle>
             </DialogHeader>
-            <AddonManager />
+            <div className="overflow-y-auto min-h-0 -mr-2 pr-2">
+              <AddonManager />
+            </div>
           </DialogContent>
         </Dialog>
       </div>
