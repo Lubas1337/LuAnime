@@ -18,24 +18,24 @@ const PRESET_ADDONS: PresetAddon[] = [
   {
     name: 'Torrentio',
     url: 'https://torrentio.strem.fun',
-    description: 'Торренты из множества трекеров. Лучший с Real-Debrid/AllDebrid.',
+    description: 'Торренты из множества трекеров. Без Debrid — magnet-ссылки, с Debrid — прямое воспроизведение.',
     tag: 'Популярный',
   },
   {
     name: 'CometStream',
     url: 'https://comet.elfhosted.com',
-    description: 'Debrid-стримы с расширенными фильтрами качества.',
+    description: 'Требуется Debrid-сервис. Настройте на сайте аддона и вставьте персональный URL.',
     tag: 'Debrid',
   },
   {
     name: 'MediaFusion',
     url: 'https://mediafusion.elfhosted.com',
-    description: 'Торренты, debrid-стримы и прямые ссылки.',
+    description: 'Торренты и debrid. Настройте на сайте аддона для прямых стримов.',
   },
   {
     name: 'Streaming Catalogs',
     url: 'https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club',
-    description: 'Каталоги Netflix, Disney+, Prime Video и других.',
+    description: 'Каталоги Netflix, Disney+, Prime Video. Только информация, не стримы.',
     tag: 'Каталоги',
   },
   {

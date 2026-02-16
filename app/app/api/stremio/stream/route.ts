@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     const streams = (data.streams || []).filter(
-      (s: { url?: string }) => s.url
+      (s: { url?: string; infoHash?: string }) => s.url || s.infoHash
     );
 
     return NextResponse.json({ streams });

@@ -61,6 +61,8 @@ export interface StreamSource {
   size: string;
   sizeBytes: number;
   url: string;
+  infoHash?: string;
+  isTorrent: boolean;
   filename?: string;
   subtitles?: StremioSubtitle[];
 }

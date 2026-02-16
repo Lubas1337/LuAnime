@@ -107,9 +107,10 @@ export function parseStreamsToSources(
   addon: StremioAddon
 ): StreamSource[] {
   return streams
-    .filter((s) => s.url)
+    .filter((s) => s.url || s.infoHash)
     .map((s) => {
       const size = parseSize(s);
+      const isTorrent = !s.url && !!s.infoHash;
       return {
         addonId: addon.id,
         addonName: addon.name,
@@ -118,7 +119,9 @@ export function parseStreamsToSources(
         quality: parseQuality(s),
         size: size.display,
         sizeBytes: size.bytes,
-        url: s.url!,
+        url: s.url || `magnet:?xt=urn:btih:${s.infoHash}`,
+        infoHash: s.infoHash,
+        isTorrent,
         filename: s.behaviorHints?.filename,
         subtitles: s.subtitles,
       };
@@ -140,6 +143,9 @@ export function sortSources(
   sortBy: 'quality' | 'size' = 'quality'
 ): StreamSource[] {
   return [...sources].sort((a, b) => {
+    // Direct streams always above torrents
+    if (a.isTorrent !== b.isTorrent) return a.isTorrent ? 1 : -1;
+
     if (sortBy === 'quality') {
       const qa = qualityOrder[a.quality] || 0;
       const qb = qualityOrder[b.quality] || 0;

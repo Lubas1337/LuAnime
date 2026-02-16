@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Play, ArrowUpDown, HardDrive, Wifi, Loader2 } from 'lucide-react';
+import { Play, ArrowUpDown, HardDrive, Wifi, Loader2, Magnet, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { sortSources } from '@/lib/api/stremio';
@@ -33,6 +33,8 @@ export function StreamList({
   const [sortBy, setSortBy] = useState<'quality' | 'size'>('quality');
 
   const sorted = sortSources(sources, sortBy);
+  const directStreams = sorted.filter((s) => !s.isTorrent);
+  const torrentStreams = sorted.filter((s) => s.isTorrent);
 
   const toggleSort = () => {
     setSortBy((prev) => (prev === 'quality' ? 'size' : 'quality'));
@@ -62,6 +64,11 @@ export function StreamList({
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {sources.length} стрим{sources.length === 1 ? '' : sources.length < 5 ? 'а' : 'ов'}
+          {directStreams.length > 0 && torrentStreams.length > 0 && (
+            <span className="ml-1">
+              ({directStreams.length} прямых, {torrentStreams.length} торрент)
+            </span>
+          )}
           {loadingAddons.length > 0 && (
             <span className="ml-2">
               <Loader2 className="inline h-3 w-3 animate-spin" /> загрузка...
@@ -75,9 +82,10 @@ export function StreamList({
       </div>
 
       <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-        {sorted.map((source, i) => (
+        {/* Direct (playable) streams */}
+        {directStreams.map((source, i) => (
           <button
-            key={`${source.addonId}-${source.url}-${i}`}
+            key={`direct-${source.addonId}-${i}`}
             onClick={() => onSelect(source)}
             className={`w-full text-left p-3 rounded-lg border transition-all hover:border-primary/50 ${
               selectedUrl === source.url
@@ -116,6 +124,66 @@ export function StreamList({
             </div>
           </button>
         ))}
+
+        {/* Torrent streams */}
+        {torrentStreams.length > 0 && (
+          <>
+            {directStreams.length > 0 && (
+              <div className="flex items-center gap-2 pt-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Торренты</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            )}
+            {directStreams.length === 0 && (
+              <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300/80">
+                <Magnet className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
+                Нет прямых стримов. Для воспроизведения торрентов настройте Debrid-сервис (Real-Debrid, AllDebrid) в аддоне.
+              </div>
+            )}
+            {torrentStreams.map((source, i) => (
+              <a
+                key={`torrent-${source.addonId}-${i}`}
+                href={source.url}
+                className="w-full text-left p-3 rounded-lg border border-border bg-card/50 hover:bg-card/80 hover:border-amber-500/30 transition-all block"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <Magnet className="h-4 w-4 text-amber-400/70" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant="outline"
+                        className={qualityColors[source.quality] || 'bg-secondary text-secondary-foreground'}
+                      >
+                        {source.quality}
+                      </Badge>
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-300/80 border-amber-500/20">
+                        Торрент
+                      </Badge>
+                      {source.size && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <HardDrive className="h-3 w-3" />
+                          {source.size}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {source.addonName}
+                      </span>
+                    </div>
+                    {source.title && (
+                      <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 break-all">
+                        {source.title}
+                      </p>
+                    )}
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                </div>
+              </a>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );
