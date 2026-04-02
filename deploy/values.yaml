@@ -26,22 +26,3 @@ resources:
 env:
   NODE_ENV: production
   HOSTNAME: "0.0.0.0"
-  TORRSERVER_INTERNAL_URL: http://torrserver:8090
-  TORRSERVER_PUBLIC_URL: https://ts.lubax.net
-
-# -- TorrServer sidecar
-torrserver:
-  enabled: false
-  image: ghcr.io/yourok/torrserver:latest
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  persistence:
-    size: 2Gi
-  ingress:
-    enabled: true
-    host: ts.lubax.net
