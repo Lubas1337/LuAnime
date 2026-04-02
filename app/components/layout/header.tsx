@@ -21,8 +21,8 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="sticky top-0 z-50 w-full px-4 pt-2">
-      <header className="glass mx-auto max-w-5xl rounded-2xl border border-border/50">
+    <div className="fixed top-0 z-50 w-full px-4 pt-2 pointer-events-none">
+      <header className="glass pointer-events-auto mx-auto max-w-5xl rounded-2xl border border-border/50">
         <div className="flex h-14 items-center justify-between px-5">
           <div className="flex items-center gap-5">
             <Link href="/" className="flex items-center gap-2 group">
