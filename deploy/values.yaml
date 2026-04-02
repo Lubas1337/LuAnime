@@ -31,7 +31,7 @@ env:
 
 # -- TorrServer sidecar
 torrserver:
-  enabled: true
+  enabled: false
   image: ghcr.io/yourok/torrserver:latest
   resources:
     requests:
