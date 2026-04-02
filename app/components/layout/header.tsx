@@ -6,6 +6,7 @@ import { Menu, X, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { SearchAutocomplete } from '@/components/search/search-autocomplete';
+import { ThemeSwitcher } from '@/components/theme/theme-switcher';
 
 const navLinks = [
   { href: '/', label: 'Главная' },
@@ -20,7 +21,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="glass sticky top-0 z-50 w-full border-b border-border">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2 group">
@@ -43,7 +44,7 @@ export function Header() {
               >
                 {link.label}
                 {pathname === link.href && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-4 bg-primary rounded-full" />
                 )}
               </Link>
             ))}
@@ -52,6 +53,8 @@ export function Header() {
 
         <div className="flex items-center gap-4">
           <SearchAutocomplete className="hidden md:block" />
+
+          <ThemeSwitcher />
 
           <Link
             href="/profile"

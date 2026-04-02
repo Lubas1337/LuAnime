@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type RefObject } from 'react';
+import { useScrollReveal } from '@/hooks/use-scroll-reveal';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Calendar, Play, Clock } from 'lucide-react';
@@ -28,6 +29,7 @@ export function ScheduleSection() {
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const tabsRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const revealRef = useScrollReveal<HTMLElement>();
 
   const today = new Date().getDay();
   const todayIndex = today === 0 ? 6 : today - 1;
@@ -65,7 +67,7 @@ export function ScheduleSection() {
   }, [activeDay, isLoading]);
 
   return (
-    <section className="animate-fade-in">
+    <section ref={revealRef as RefObject<HTMLElement | null>} className="scroll-reveal">
       {/* Apple-style header */}
       <div className="flex items-center gap-4 mb-8">
         <div className="relative">

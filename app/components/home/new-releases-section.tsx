@@ -1,17 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
+import { useScrollReveal } from '@/hooks/use-scroll-reveal';
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AnimeGrid } from '@/components/anime/anime-grid';
+import { CardSkeleton } from '@/components/ui/card-skeleton';
 import { getSchedule, getAnimeByIds } from '@/lib/api/anime';
 import type { Anime, ScheduleAnime } from '@/types/anime';
 
 export function NewReleasesSection() {
   const [anime, setAnime] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const revealRef = useScrollReveal<HTMLElement>();
 
   useEffect(() => {
     const fetchNewReleases = async () => {
@@ -35,7 +37,7 @@ export function NewReleasesSection() {
   }, []);
 
   return (
-    <section>
+    <section ref={revealRef as RefObject<HTMLElement | null>} className="scroll-reveal">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
@@ -57,11 +59,7 @@ export function NewReleasesSection() {
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i}>
-              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-              <Skeleton className="h-4 w-full mt-3" />
-              <Skeleton className="h-3 w-20 mt-2" />
-            </div>
+            <CardSkeleton key={i} />
           ))}
         </div>
       ) : anime.length > 0 ? (

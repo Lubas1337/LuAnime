@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type RefObject } from 'react';
+import { useScrollReveal } from '@/hooks/use-scroll-reveal';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ export function TrendingSection() {
   const [anime, setAnime] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const revealRef = useScrollReveal<HTMLElement>();
 
   useEffect(() => {
     const fetchTrending = async () => {
@@ -47,7 +49,7 @@ export function TrendingSection() {
   };
 
   return (
-    <section>
+    <section ref={revealRef as RefObject<HTMLElement | null>} className="scroll-reveal">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">

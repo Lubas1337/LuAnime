@@ -12,7 +12,7 @@ import { EpisodeList } from '@/components/anime/episode-list';
 import { AnimeCard } from '@/components/anime/anime-card';
 import {
   getAnimeById,
-  getTranslations,
+  getVoiceovers,
   getEpisodes,
 } from '@/lib/api/anime';
 import { usePlayerStore } from '@/lib/store/player-store';
@@ -62,7 +62,7 @@ export default function AnimePage({
       try {
         const [animeData, translationsData] = await Promise.all([
           getAnimeById(animeId),
-          getTranslations(animeId),
+          getVoiceovers(animeId),
         ]);
 
         setAnime(animeData);
@@ -73,8 +73,7 @@ export default function AnimePage({
           const defaultTranslation = translationsData[0];
           setCurrentTranslation(defaultTranslation);
 
-          const episodesCount = animeData.episodes_released || animeData.episodes_total || 0;
-          const episodesData = await getEpisodes(animeId, defaultTranslation.id, episodesCount);
+          const episodesData = await getEpisodes(animeId, defaultTranslation.id);
           setEpisodes(episodesData);
 
           const savedProgress = getProgress(animeId);
@@ -102,8 +101,7 @@ export default function AnimePage({
     setIsEpisodesLoading(true);
 
     try {
-      const episodesCount = anime?.episodes_released || anime?.episodes_total || 0;
-      const episodesData = await getEpisodes(animeId, translation.id, episodesCount);
+      const episodesData = await getEpisodes(animeId, translation.id);
       setEpisodes(episodesData);
       setCurrentEpisode(null);
     } catch (error) {

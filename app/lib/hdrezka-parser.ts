@@ -1,6 +1,3 @@
-// HDRezka parser implementation
-// Handles search and stream extraction
-
 const REZKA_MIRRORS = [
   'https://hdrezka.ag',
   'https://rezka.ag',

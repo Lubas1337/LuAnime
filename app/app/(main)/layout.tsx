@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { BackgroundGradient } from '@/components/layout/background-gradient';
 import { WebsiteJsonLd, OrganizationJsonLd } from '@/components/seo/json-ld';
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider';
 
@@ -11,6 +12,7 @@ export default function MainLayout({
   return (
     <AnalyticsProvider>
       <div className="flex min-h-screen flex-col">
+        <BackgroundGradient />
         <WebsiteJsonLd />
         <OrganizationJsonLd />
         <Header />

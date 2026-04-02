@@ -11,11 +11,7 @@ interface KodikParseResponse {
   error?: string;
 }
 
-/**
- * Parses a Kodik embed URL to extract direct video URLs.
- * Calls the server-side API route which handles the actual parsing
- * (to avoid CORS issues from the browser).
- */
+// Server-side proxy to avoid CORS
 export async function parseKodikUrl(
   embedUrl: string
 ): Promise<VideoSource[]> {

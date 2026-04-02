@@ -149,15 +149,9 @@ export async function getSources(animeId: number, typeId: number): Promise<{ id:
   }
 }
 
-export async function getTranslations(animeId: number): Promise<Translation[]> {
-  // This now returns voiceovers
-  return getVoiceovers(animeId);
-}
-
 export async function getEpisodes(
   animeId: number,
   typeId: number,
-  episodesCount?: number
 ): Promise<Episode[]> {
   try {
     // First get sources for this voiceover type

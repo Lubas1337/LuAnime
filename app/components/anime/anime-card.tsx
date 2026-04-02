@@ -75,9 +75,17 @@ export function AnimeCard({ anime, variant = 'default' }: AnimeCardProps) {
         )}
 
         {rating !== undefined && rating > 0 && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 backdrop-blur-sm">
-            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-medium text-white">
+          <div className={`absolute top-2 right-2 flex items-center gap-1 rounded-md px-2 py-1 backdrop-blur-sm ${
+            rating >= 8 ? 'bg-green-500/20 text-green-300' :
+            rating >= 6 ? 'bg-yellow-500/20 text-yellow-300' :
+            'bg-red-500/20 text-red-300'
+          }`}>
+            <Star className={`h-3.5 w-3.5 ${
+              rating >= 8 ? 'fill-green-400 text-green-400' :
+              rating >= 6 ? 'fill-yellow-400 text-yellow-400' :
+              'fill-red-400 text-red-400'
+            }`} />
+            <span className="text-xs font-medium">
               {rating.toFixed(1)}
             </span>
           </div>
