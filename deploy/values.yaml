@@ -1,0 +1,47 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/lubas1337/luwatch
+  tag: latest
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-creds
+
+ingress:
+  enabled: true
+  className: traefik
+  host: watch.lubax.net
+  tls:
+    secretName: lubax-net-wildcard-tls
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+env:
+  NODE_ENV: production
+  HOSTNAME: "0.0.0.0"
+  TORRSERVER_INTERNAL_URL: http://torrserver:8090
+  TORRSERVER_PUBLIC_URL: https://ts.lubax.net
+
+# -- TorrServer sidecar
+torrserver:
+  enabled: true
+  image: ghcr.io/yourok/torrserver:latest
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    size: 2Gi
+  ingress:
+    enabled: true
+    host: ts.lubax.net

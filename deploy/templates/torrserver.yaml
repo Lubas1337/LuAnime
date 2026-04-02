@@ -1,0 +1,113 @@
+{{- if .Values.torrserver.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: torrserver
+  labels:
+    app: torrserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: torrserver
+  template:
+    metadata:
+      labels:
+        app: torrserver
+    spec:
+      containers:
+        - name: torrserver
+          image: {{ .Values.torrserver.image }}
+          ports:
+            - name: http
+              containerPort: 8090
+          volumeMounts:
+            - name: data
+              mountPath: /opt/ts
+          resources:
+            {{- toYaml .Values.torrserver.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /echo
+              port: 8090
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /echo
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: torrserver-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: torrserver-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.torrserver.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: torrserver
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8090
+      targetPort: 8090
+  selector:
+    app: torrserver
+---
+{{- if .Values.torrserver.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: torrserver
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-torrserver-cors@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - {{ .Values.torrserver.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  rules:
+    - host: {{ .Values.torrserver.ingress.host }}
+      http:
+        paths:
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: torrserver
+                port:
+                  number: 8090
+          - path: /echo
+            pathType: Prefix
+            backend:
+              service:
+                name: torrserver
+                port:
+                  number: 8090
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: torrserver-cors
+spec:
+  headers:
+    accessControlAllowMethods: [GET, HEAD, OPTIONS]
+    accessControlAllowHeaders: [Range]
+    accessControlExposeHeaders: [Content-Range, Content-Length, Accept-Ranges]
+    accessControlAllowOriginListRegex:
+      - "https://(watch|anime)\\.lubax\\.net"
+    accessControlMaxAge: 86400
+{{- end }}
+{{- end }}
