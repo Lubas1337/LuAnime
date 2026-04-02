@@ -17,6 +17,18 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  // Redirect old domain
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'anime.lubax.net' }],
+        destination: 'https://watch.lubax.net/:path*',
+        permanent: true,
+      },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [
