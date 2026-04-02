@@ -86,7 +86,7 @@ export function HeroBanner() {
   const anime = current.anime;
 
   return (
-    <div className="relative h-[500px] md:h-[600px] w-full overflow-hidden">
+    <div className="relative -mt-[4.5rem] h-[500px] md:h-[600px] w-full overflow-hidden">
       <div className="absolute inset-0">
         <Image
           src={current.image}

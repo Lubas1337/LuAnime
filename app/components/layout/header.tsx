@@ -13,7 +13,6 @@ const navLinks = [
   { href: '/catalog', label: 'Каталог' },
   { href: '/movies', label: 'Кино' },
   { href: '/series', label: 'Сериалы' },
-  { href: '/stremio', label: 'Stremio' },
 ];
 
 export function Header() {
