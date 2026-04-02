@@ -318,7 +318,8 @@ export function VideoPlayer({
     const isKodik =
       embedUrl.includes('kodik.') ||
       embedUrl.includes('aniqit.') ||
-      embedUrl.includes('kodik.info');
+      embedUrl.includes('kodik.info') ||
+      embedUrl.includes('kodikplayer.com');
 
     if (!isKodik) {
       setKodikFailed(true);
@@ -386,10 +387,6 @@ export function VideoPlayer({
 
   // If no sources, show external search options
   if (allSources.length === 0) {
-    const searchQuery = encodeURIComponent(
-      `${animeTitle || 'anime'} ${episodeNumber ? `серия ${episodeNumber}` : ''}`
-    );
-
     return (
       <div className="video-player-container flex flex-col items-center justify-center bg-card gap-4">
         <div

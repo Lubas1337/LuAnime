@@ -17,7 +17,7 @@ interface KodikVideoResult {
   type: string;
 }
 
-const KODIK_DOMAINS = ['kodik.info', 'aniqit.com', 'kodik.cc', 'kodik.biz'];
+const KODIK_DOMAINS = ['kodik.info', 'aniqit.com', 'kodik.cc', 'kodik.biz', 'kodikplayer.com'];
 const FALLBACK_ENDPOINTS = ['/ftor', '/kor', '/gvi'];
 
 const kodikLinkRegexp = /^(?:https?:|)\/\/([a-z0-9]+\.[a-z]+)\/([a-z]+)\/(\d+)\/([0-9a-z]+)\/(\d+p)/;
