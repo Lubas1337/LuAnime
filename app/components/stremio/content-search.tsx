@@ -159,7 +159,7 @@ export function ContentSearch() {
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                     item.mediaType === 'movie'
                       ? 'bg-blue-500/80 text-white'
-                      : 'bg-purple-500/80 text-white'
+                      : 'bg-primary/80 text-primary-foreground'
                   }`}>
                     {item.mediaType === 'movie' ? 'Фильм' : 'Сериал'}
                   </span>

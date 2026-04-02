@@ -73,7 +73,7 @@ function ProfilePageContent() {
       {/* Header area */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-violet-500/10 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
         <div className="container mx-auto px-4 py-10 relative">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">Мой профиль</h1>
           <p className="text-muted-foreground mt-2">Избранное и история просмотров</p>
@@ -197,7 +197,7 @@ function ProfilePageContent() {
                         {/* Progress bar */}
                         <div className="mt-2 h-1.5 bg-secondary rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-500 to-primary transition-all duration-300"
+                            className="h-full rounded-full bg-primary transition-all duration-300"
                             style={{ width: `${Math.min(progressPercent, 100)}%` }}
                           />
                         </div>

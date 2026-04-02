@@ -71,7 +71,7 @@ export function ScheduleSection() {
       {/* Apple-style header */}
       <div className="flex items-center gap-4 mb-8">
         <div className="relative">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/25">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25">
             <Calendar className="h-6 w-6 text-white" />
           </div>
           <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-background animate-pulse" />
@@ -120,7 +120,7 @@ export function ScheduleSection() {
                   <span className="hidden sm:inline">{day}</span>
                   <span className="sm:hidden">{shortDayNames[index]}</span>
                   {index === todayIndex && (
-                    <span className="ml-2 inline-flex items-center justify-center h-5 px-2 text-[10px] font-semibold uppercase tracking-wider bg-violet-500/20 text-violet-400 rounded-full">
+                    <span className="ml-2 inline-flex items-center justify-center h-5 px-2 text-[10px] font-semibold uppercase tracking-wider bg-primary/20 text-primary rounded-full">
                       Сейчас
                     </span>
                   )}
@@ -199,7 +199,7 @@ function ScheduleCard({
 
         {item.episodes_released && (
           <div className="flex items-center gap-2 mt-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-400">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 text-primary">
               <Clock className="h-3 w-3" />
               <span className="text-xs font-medium">
                 Серия {item.episodes_released}
